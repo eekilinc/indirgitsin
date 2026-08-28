@@ -85,28 +85,54 @@ object YoutubeExtractor {
         }
     }
 
-    // Innertube - YouTube'un kendi API'si (WEB client, en stabil)
+    // Innertube - çoklu client dene (ANDROID en iyi, sonra IOS/WEB fallback - cipher sorunu için)
     private fun tryInnertube(videoId: String): VideoInfo? {
+        val clients = listOf(
+            // ANDROID - genellikle deciphered URL verir
+            Triple("ANDROID", "19.09.37", "com.google.android.youtube/19.09.37 (Linux; U; Android 13) gzip"),
+            // ANDROID_MUSIC - Shorts ve Music için daha iyi
+            Triple("ANDROID_MUSIC", "6.21", "com.google.android.apps.youtube.music/6.21 (Linux; U; Android 13) gzip"),
+            // IOS - cipher bypass için çok iyi
+            Triple("IOS", "19.09.3", "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 17_2 like Mac OS X)"),
+            // WEB - son çare
+            Triple("WEB", "2.20240101.00.00", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        )
+        for ((clientName, clientVersion, userAgent) in clients) {
+            try {
+                val result = tryInnertubeWithClient(videoId, clientName, clientVersion, userAgent)
+                if (result != null) return result
+            } catch (_: Exception) { continue }
+        }
+        return null
+    }
+
+    private fun tryInnertubeWithClient(videoId: String, clientName: String, clientVersion: String, userAgent: String): VideoInfo? {
         return try {
+            val clientJson = JSONObject().apply {
+                put("clientName", clientName)
+                put("clientVersion", clientVersion)
+                put("hl", "tr")
+                put("gl", "TR")
+                put("utcOffsetMinutes", 180)
+                if (clientName == "ANDROID" || clientName == "ANDROID_MUSIC") {
+                    put("androidSdkVersion", 30)
+                }
+                if (clientName == "IOS") {
+                    put("deviceModel", "iPhone16,2")
+                    put("osName", "iPhone")
+                    put("osVersion", "17.2")
+                }
+            }
             val jsonBody = JSONObject().apply {
                 put("videoId", videoId)
-                put("context", JSONObject().apply {
-                    put("client", JSONObject().apply {
-                        put("clientName", "ANDROID")
-                        put("clientVersion", "19.09.37")
-                        put("androidSdkVersion", 30)
-                        put("hl", "tr")
-                        put("gl", "TR")
-                        put("utcOffsetMinutes", 180)
-                    })
-                })
+                put("context", JSONObject().apply { put("client", clientJson) })
                 put("contentCheckOk", true)
                 put("racyCheckOk", true)
             }.toString()
 
             val req = Request.Builder()
                 .url("https://www.youtube.com/youtubei/v1/player?key=$INNERTUBE_KEY")
-                .header("User-Agent", "com.google.android.youtube/19.09.37 (Linux; U; Android 13) gzip")
+                .header("User-Agent", userAgent)
                 .header("Content-Type", "application/json")
                 .post(jsonBody.toRequestBody("application/json".toMediaType()))
                 .build()
