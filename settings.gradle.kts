@@ -17,4 +17,8 @@ rootProject.name = "İndir Gitsin"
 include(":app")
 
 // Composite build: cipher submodule (com.zemer:cipher)
-includeBuild("cipher")
+includeBuild("cipher") {
+    dependencySubstitution {
+        substitute(module("com.zemer:cipher")).using(project(":library"))
+    }
+}
