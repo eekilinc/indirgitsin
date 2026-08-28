@@ -4,16 +4,18 @@ import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
 import com.indirgitsin.app.util.YoutubeLinkHelper
 import kotlinx.coroutines.*
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 object YoutubeExtractor {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
+        .connectTimeout(7, TimeUnit.SECONDS)
+        .readTimeout(7, TimeUnit.SECONDS)
         .build()
 
     private val pipedInstances = listOf(
@@ -23,10 +25,17 @@ object YoutubeExtractor {
         "https://api.piped.projectsegfau.lt"
     )
 
-    // Cache - aynı videoyu tekrar çözme
+    private val invidiousInstances = listOf(
+        "https://vid.puffyan.us",
+        "https://invidious.snopyta.org",
+        "https://y.com.sb",
+        "https://inv.n8pjl.ca"
+    )
+
     private val cache = mutableMapOf<String, VideoInfo>()
     private val cacheTime = mutableMapOf<String, Long>()
     private const val CACHE_TTL_MS = 10 * 60 * 1000L
+    private const val INNERTUBE_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
 
     suspend fun extract(url: String): Result<VideoInfo> = withContext(Dispatchers.IO) {
         try {
@@ -34,7 +43,6 @@ object YoutubeExtractor {
             val videoId = YoutubeLinkHelper.extractVideoId(normalized)
                 ?: return@withContext Result.failure(Exception("Geçersiz YouTube linki"))
 
-            // Cache hit?
             synchronized(cache) {
                 val cached = cache[videoId]
                 val t = cacheTime[videoId] ?: 0
@@ -43,19 +51,31 @@ object YoutubeExtractor {
                 }
             }
 
+            // 1) Innertube - en güvenilir, doğrudan YouTube
+            val innertube = withTimeoutOrNull(8000) { tryInnertube(videoId) }
+            if (innertube != null) {
+                synchronized(cache) { cache[videoId] = innertube; cacheTime[videoId] = System.currentTimeMillis() }
+                return@withContext Result.success(innertube)
+            }
+
+            // 2) Piped paralel
             val pipedResult = tryPipedParallel(videoId)
             if (pipedResult != null) {
-                synchronized(cache) {
-                    cache[videoId] = pipedResult
-                    cacheTime[videoId] = System.currentTimeMillis()
-                }
+                synchronized(cache) { cache[videoId] = pipedResult; cacheTime[videoId] = System.currentTimeMillis() }
                 return@withContext Result.success(pipedResult)
+            }
+
+            // 3) Invidious paralel
+            val invidious = tryInvidiousParallel(videoId)
+            if (invidious != null) {
+                synchronized(cache) { cache[videoId] = invidious; cacheTime[videoId] = System.currentTimeMillis() }
+                return@withContext Result.success(invidious)
             }
 
             val oembed = tryOEmbed(videoId)
             if (oembed != null) {
                 return@withContext Result.failure(
-                    Exception("Sunucular yoğun, ${oembed.title} için kalite listesi alınamadı. 5 sn sonra tekrar dene.")
+                    Exception("Kalite listesi alınamadı ama video bulundu: ${oembed.title}\nYouTube bu videoyu kısıtlamış olabilir. Farklı bir video dene veya 10 sn sonra tekrar dene.")
                 )
             }
 
@@ -65,16 +85,142 @@ object YoutubeExtractor {
         }
     }
 
-    // Paralel race - ilk başarılı dönen kazanır, 5sn timeout
+    // Innertube - YouTube'un kendi API'si (WEB client, en stabil)
+    private fun tryInnertube(videoId: String): VideoInfo? {
+        return try {
+            val jsonBody = JSONObject().apply {
+                put("videoId", videoId)
+                put("context", JSONObject().apply {
+                    put("client", JSONObject().apply {
+                        put("clientName", "ANDROID")
+                        put("clientVersion", "19.09.37")
+                        put("androidSdkVersion", 30)
+                        put("hl", "tr")
+                        put("gl", "TR")
+                        put("utcOffsetMinutes", 180)
+                    })
+                })
+                put("contentCheckOk", true)
+                put("racyCheckOk", true)
+            }.toString()
+
+            val req = Request.Builder()
+                .url("https://www.youtube.com/youtubei/v1/player?key=$INNERTUBE_KEY")
+                .header("User-Agent", "com.google.android.youtube/19.09.37 (Linux; U; Android 13) gzip")
+                .header("Content-Type", "application/json")
+                .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val resp = client.newCall(req).execute()
+            if (!resp.isSuccessful) {
+                resp.close()
+                return null
+            }
+            val body = resp.body?.string()
+            resp.close()
+            if (body.isNullOrBlank()) return null
+            val json = JSONObject(body)
+
+            val playability = json.optJSONObject("playabilityStatus")?.optString("status", "")
+            if (playability != null && playability != "OK" && playability.isNotBlank()) {
+                // AGE_VERIFICATION_REQUIRED vs UNPLAYABLE vs OK
+                if (playability == "LOGIN_REQUIRED" || playability == "UNPLAYABLE") return null
+            }
+
+            val videoDetails = json.optJSONObject("videoDetails") ?: return null
+            val title = videoDetails.optString("title", "Bilinmeyen Başlık")
+            val author = videoDetails.optString("author", "Bilinmeyen Kanal")
+            val thumb = videoDetails.optJSONArray("thumbnail")?.optJSONObject(0)?.optJSONArray("thumbnails")
+                ?.let { arr -> (0 until arr.length()).maxByOrNull { arr.getJSONObject(it).optInt("width", 0) }?.optString("url", "") }
+                ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+            val duration = videoDetails.optString("lengthSeconds", "0").toLongOrNull() ?: 0L
+            val views = videoDetails.optString("viewCount", "0").toLongOrNull() ?: 0L
+
+            val streamingData = json.optJSONObject("streamingData") ?: return null
+            val streams = mutableListOf<StreamOption>()
+
+            // Muxed formats (video+audio birlikte) - en kolay indirilen
+            val formats = streamingData.optJSONArray("formats")
+            if (formats != null) {
+                for (i in 0 until formats.length()) {
+                    val f = formats.getJSONObject(i)
+                    val url = f.optString("url", "")
+                    if (url.isBlank()) continue // cipher gerekebilir, atla
+                    val mime = f.optString("mimeType", "video/mp4")
+                    val quality = f.optString("qualityLabel", f.optString("quality", ""))
+                    val ext = when {
+                        mime.contains("webm") -> "webm"
+                        else -> "mp4"
+                    }
+                    streams.add(StreamOption("$quality • ${ext.uppercase()} (hızlı)", ext, quality, url, true, false))
+                }
+            }
+
+            // Adaptive - video only ve audio only
+            val adaptive = streamingData.optJSONArray("adaptiveFormats")
+            if (adaptive != null) {
+                for (i in 0 until adaptive.length()) {
+                    val f = adaptive.getJSONObject(i)
+                    val url = f.optString("url", "")
+                    if (url.isBlank()) continue
+                    val mime = f.optString("mimeType", "")
+                    if (mime.contains("video")) {
+                        val quality = f.optString("qualityLabel", "")
+                        if (quality.isBlank()) continue // video-only kalitesizleri atla, muxed zaten var
+                        val ext = if (mime.contains("webm")) "webm" else "mp4"
+                        // Video-only'yi ekleme - sadece muxed sunuyoruz, video-only ses gerektirir
+                        // Ama en yüksek kalite için ekleyelim, kullanıcı isterse sadece görüntü indirebilir
+                        // streams.add(StreamOption("$quality • $ext (görüntü)", ext, quality, url, true, false))
+                    } else if (mime.contains("audio")) {
+                        val bitrate = f.optInt("bitrate", 0) / 1000
+                        val ext = when {
+                            mime.contains("webm") || mime.contains("opus") -> "webm"
+                            mime.contains("mp4") -> "m4a"
+                            else -> "m4a"
+                        }
+                        val q = if (bitrate > 0) "${bitrate}kbps" else f.optString("quality", "")
+                        streams.add(
+                            StreamOption(
+                                label = "Ses • ${ext.uppercase()} ${if (bitrate > 0) "${bitrate}kbps" else ""}".trim(),
+                                extension = ext,
+                                quality = q,
+                                url = url,
+                                isVideo = false,
+                                isAudioOnly = true,
+                                bitrate = bitrate
+                            )
+                        )
+                    }
+                }
+            }
+
+            // HLS fallback
+            val hls = streamingData.optString("hlsManifestUrl", "")
+            if (streams.isEmpty() && hls.isNotBlank()) {
+                streams.add(StreamOption("Canlı/HLS • M3U8", "m3u8", "auto", hls, true, false))
+            }
+
+            if (streams.isEmpty()) return null
+
+            // Deduplicate ve sırala - muxed önce, sonra ses bitrate
+            val sorted = streams.distinctBy { it.url }.sortedWith(
+                compareBy<StreamOption> { !it.isVideo }
+                    .thenByDescending { extractQualityNumber(it.quality) }
+                    .thenByDescending { it.bitrate }
+            )
+
+            VideoInfo(videoId, title, author, thumb, duration, views, "https://www.youtube.com/watch?v=$videoId", sorted)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private suspend fun tryPipedParallel(videoId: String): VideoInfo? = coroutineScope {
         val deferreds = pipedInstances.map { base ->
             async(Dispatchers.IO) {
-                try {
-                    withTimeout(5000) { fetchSinglePiped(base, videoId) }
-                } catch (_: Exception) { null }
+                try { withTimeout(5000) { fetchSinglePiped(base, videoId) } } catch (_: Exception) { null }
             }
         }
-        // İlk başarılı sonucu al, diğerlerini iptal et
         for (d in deferreds) {
             try {
                 val res = d.await()
@@ -84,8 +230,7 @@ object YoutubeExtractor {
                 }
             } catch (_: Exception) { }
         }
-        // Hiçbiri başarılı değilse, ilk non-null'u bekle
-        deferreds.forEach { it.await() }
+        deferreds.forEach { try { it.await() } catch (_: Exception) {} }
         null
     }
 
@@ -104,7 +249,7 @@ object YoutubeExtractor {
         resp.close()
         if (body.isNullOrBlank()) return null
         val json = JSONObject(body)
-        if (json.has("error") || json.has("message") && json.optString("message").contains("not found", true)) return null
+        if (json.has("error")) return null
 
         val title = json.optString("title", "Bilinmeyen Başlık")
         if (title.isBlank() || title == "Bilinmeyen Başlık") return null
@@ -128,7 +273,6 @@ object YoutubeExtractor {
                     mime.contains("mp4") -> "mp4"
                     else -> "mp4"
                 }
-                // Sadece muxed (video+audio) olanları öne al - itag 18,22 gibi
                 streams.add(StreamOption("$quality • ${ext.uppercase()}", ext, quality, url, true, false))
             }
         }
@@ -169,7 +313,97 @@ object YoutubeExtractor {
 
         if (streams.isEmpty()) return null
 
-        // En iyi kaliteler üste: 1080p > 720p > 480p, seslerde bitrate yüksek
+        val sorted = streams.distinctBy { it.url }.sortedWith(
+            compareBy<StreamOption> { !it.isVideo }
+                .thenByDescending { extractQualityNumber(it.quality) }
+                .thenByDescending { it.bitrate }
+        )
+
+        return VideoInfo(videoId, title, author, thumb, duration, views, "https://www.youtube.com/watch?v=$videoId", sorted)
+    }
+
+    private suspend fun tryInvidiousParallel(videoId: String): VideoInfo? = coroutineScope {
+        val deferreds = invidiousInstances.map { base ->
+            async(Dispatchers.IO) {
+                try { withTimeout(5000) { fetchSingleInvidious(base, videoId) } } catch (_: Exception) { null }
+            }
+        }
+        for (d in deferreds) {
+            try {
+                val res = d.await()
+                if (res != null) {
+                    deferreds.forEach { if (it != d) it.cancel() }
+                    return@coroutineScope res
+                }
+            } catch (_: Exception) {}
+        }
+        null
+    }
+
+    private fun fetchSingleInvidious(base: String, videoId: String): VideoInfo? {
+        val req = Request.Builder()
+            .url("$base/api/v1/videos/$videoId")
+            .header("User-Agent", "Mozilla/5.0")
+            .build()
+        val resp = client.newCall(req).execute()
+        if (!resp.isSuccessful) {
+            resp.close()
+            return null
+        }
+        val body = resp.body?.string()
+        resp.close()
+        if (body.isNullOrBlank()) return null
+        val json = JSONObject(body)
+        if (json.has("error")) return null
+
+        val title = json.optString("title", "Bilinmeyen Başlık")
+        val author = json.optString("author", "Bilinmeyen Kanal")
+        val thumb = json.optJSONArray("videoThumbnails")?.let { arr ->
+            (0 until arr.length()).maxByOrNull { arr.getJSONObject(it).optInt("width", 0) }?.optString("url", "")
+        } ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+        val duration = json.optLong("lengthSeconds", 0L)
+        val views = json.optLong("viewCount", 0L)
+
+        val streams = mutableListOf<StreamOption>()
+
+        val fArr = json.optJSONArray("formatStreams")
+        if (fArr != null) {
+            for (i in 0 until fArr.length()) {
+                val o = fArr.getJSONObject(i)
+                val url = o.optString("url", "")
+                if (url.isBlank()) continue
+                val quality = o.optString("qualityLabel", o.optString("quality", ""))
+                val ext = o.optString("container", "mp4")
+                streams.add(StreamOption("$quality • ${ext.uppercase()}", ext, quality, url, true, false))
+            }
+        }
+
+        val aArr = json.optJSONArray("adaptiveFormats")
+        if (aArr != null) {
+            for (i in 0 until aArr.length()) {
+                val o = aArr.getJSONObject(i)
+                val type = o.optString("type", "")
+                if (!type.contains("audio")) continue
+                val url = o.optString("url", "")
+                if (url.isBlank()) continue
+                val ext = o.optString("container", "m4a")
+                val bitrate = o.optString("bitrate", "0").toIntOrNull()?.div(1000) ?: 0
+                streams.add(
+                    StreamOption(
+                        label = "Ses • ${ext.uppercase()} ${if (bitrate > 0) "${bitrate}kbps" else ""}".trim(),
+                        extension = ext,
+                        quality = if (bitrate > 0) "${bitrate}kbps" else "",
+                        url = url,
+                        isVideo = false,
+                        isAudioOnly = true,
+                        bitrate = bitrate
+                    )
+                )
+            }
+        }
+
+        if (streams.isEmpty()) return null
+
         val sorted = streams.distinctBy { it.url }.sortedWith(
             compareBy<StreamOption> { !it.isVideo }
                 .thenByDescending { extractQualityNumber(it.quality) }
