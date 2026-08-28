@@ -171,7 +171,7 @@ private fun YtTopBar() {
                     Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                 }
                 Spacer(Modifier.width(4.dp))
-                Text("Premium", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, letterSpacing = (-0.3).toSp())
+                Text("Premium", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(6.dp))
                 Surface(shape = RoundedCornerShape(4.dp), color = YtRed) {
                     Text("  PREMIUM  ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
@@ -187,8 +187,6 @@ private fun YtTopBar() {
         }
     }
 }
-
-private fun androidx.compose.ui.unit.TextUnit.toSp() = this
 
 @Composable
 private fun YtPremiumBanner() {

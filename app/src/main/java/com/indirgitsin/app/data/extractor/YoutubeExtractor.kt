@@ -130,9 +130,24 @@ object YoutubeExtractor {
             val videoDetails = json.optJSONObject("videoDetails") ?: return null
             val title = videoDetails.optString("title", "Bilinmeyen Başlık")
             val author = videoDetails.optString("author", "Bilinmeyen Kanal")
-            val thumb = videoDetails.optJSONArray("thumbnail")?.optJSONObject(0)?.optJSONArray("thumbnails")
-                ?.let { arr -> (0 until arr.length()).maxByOrNull { arr.getJSONObject(it).optInt("width", 0) }?.optString("url", "") }
-                ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+            val thumb = run {
+                val thumbArray = videoDetails.optJSONArray("thumbnail")?.optJSONObject(0)?.optJSONArray("thumbnails")
+                if (thumbArray != null && thumbArray.length() > 0) {
+                    var bestUrl = ""
+                    var bestW = -1
+                    for (i in 0 until thumbArray.length()) {
+                        val o = thumbArray.getJSONObject(i)
+                        val w = o.optInt("width", 0)
+                        if (w > bestW) {
+                            bestW = w
+                            bestUrl = o.optString("url", "")
+                        }
+                    }
+                    if (bestUrl.isNotBlank()) bestUrl else "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+                } else {
+                    "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+                }
+            }
             val duration = videoDetails.optString("lengthSeconds", "0").toLongOrNull() ?: 0L
             val views = videoDetails.optString("viewCount", "0").toLongOrNull() ?: 0L
 
@@ -358,9 +373,24 @@ object YoutubeExtractor {
 
         val title = json.optString("title", "Bilinmeyen Başlık")
         val author = json.optString("author", "Bilinmeyen Kanal")
-        val thumb = json.optJSONArray("videoThumbnails")?.let { arr ->
-            (0 until arr.length()).maxByOrNull { arr.getJSONObject(it).optInt("width", 0) }?.optString("url", "")
-        } ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+        val thumb = run {
+            val arr = json.optJSONArray("videoThumbnails")
+            if (arr != null && arr.length() > 0) {
+                var bestUrl = ""
+                var bestW = -1
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val w = o.optInt("width", 0)
+                    if (w > bestW) {
+                        bestW = w
+                        bestUrl = o.optString("url", "")
+                    }
+                }
+                if (bestUrl.isNotBlank()) bestUrl else "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+            } else {
+                "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+            }
+        }
         val duration = json.optLong("lengthSeconds", 0L)
         val views = json.optLong("viewCount", 0L)
 
