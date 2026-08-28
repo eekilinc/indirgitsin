@@ -15,3 +15,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "İndir Gitsin"
 include(":app")
+
+// Composite build: cipher submodule (com.zemer:cipher)
+includeBuild("cipher")

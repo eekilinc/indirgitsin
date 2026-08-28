@@ -63,8 +63,8 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // zemer-cipher: YouTube cipher + PoToken (JitPack)
-    implementation("com.zemer:cipher:1.0.0")
+    // zemer-cipher: YouTube cipher + PoToken (composite build from cipher/ submodule)
+    implementation("com.zemer:cipher")
 
     // DataStore (ayarlar)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
