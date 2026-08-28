@@ -41,7 +41,7 @@ fun HomeScreen(
     inputUrl: String,
     onInputChange: (String) -> Unit,
     uiState: UiState,
-    onFetch: () -> Unit,
+    onFetch: (String) -> Unit,
     onDownload: (VideoInfo, StreamOption) -> Unit,
     onPaste: () -> Unit,
     historyDao: HistoryDao? = null,
@@ -59,7 +59,7 @@ fun HomeScreen(
         val url = YoutubeLinkHelper.findYoutubeUrlInText(text) ?: text
         if (!url.isNullOrBlank()) {
             onInputChange(url)
-            if (YoutubeLinkHelper.isValidYoutubeUrl(url)) onFetch()
+            if (YoutubeLinkHelper.isValidYoutubeUrl(url)) onFetch(url)
         }
         onPaste()
     }
@@ -216,7 +216,7 @@ private fun YtPremiumBanner() {
 private fun YtSearchBar(
     inputUrl: String,
     onInputChange: (String) -> Unit,
-    onFetch: () -> Unit,
+    onFetch: (String) -> Unit,
     onPaste: () -> Unit
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -248,7 +248,7 @@ private fun YtSearchBar(
                     IconButton(onClick = { onInputChange("") }) { Icon(Icons.Rounded.Clear, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) }
                 }
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(36.dp)) {
-                    IconButton(onClick = onFetch, enabled = inputUrl.isNotBlank(), modifier = Modifier.fillMaxSize()) {
+                    IconButton(onClick = { onFetch(inputUrl) }, enabled = inputUrl.isNotBlank(), modifier = Modifier.fillMaxSize()) {
                         Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.background, modifier = Modifier.size(18.dp))
                     }
                 }
@@ -267,7 +267,7 @@ private fun YtSearchBar(
                 Text("Yapıştır", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             }
             Button(
-                onClick = onFetch,
+                onClick = { onFetch(inputUrl) },
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = YtRed),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
@@ -601,7 +601,7 @@ private fun YtPreview() {
                     )
                 )
             ),
-            onFetch = {},
+            onFetch = { _ -> },
             onDownload = { _, _ -> },
             onPaste = {}
         )

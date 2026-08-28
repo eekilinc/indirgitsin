@@ -199,15 +199,23 @@ object YoutubeExtractor {
             if (formats != null) {
                 for (i in 0 until formats.length()) {
                     val f = formats.getJSONObject(i)
-                    val url = f.optString("url", "")
-                    if (url.isBlank()) continue // cipher gerekebilir, atla
+                    var url = f.optString("url", "")
+                    if (url.isBlank()) {
+                        val cipher = f.optString("cipher", f.optString("signatureCipher", ""))
+                        if (cipher.isNotBlank()) {
+                            val m = Regex("""url=([^&]+)""").find(cipher)
+                            if (m != null) try { url = java.net.URLDecoder.decode(m.groupValues[1], "UTF-8") } catch (_: Exception) {}
+                        }
+                    }
+                    if (url.isBlank()) continue
                     val mime = f.optString("mimeType", "video/mp4")
                     val quality = f.optString("qualityLabel", f.optString("quality", ""))
+                    if (quality.isBlank()) continue
                     val ext = when {
                         mime.contains("webm") -> "webm"
                         else -> "mp4"
                     }
-                    streams.add(StreamOption("$quality • ${ext.uppercase()} (hızlı)", ext, quality, url, true, false))
+                    streams.add(StreamOption("$quality • ${ext.uppercase()}", ext, quality, url, true, false))
                 }
             }
 
@@ -216,16 +224,26 @@ object YoutubeExtractor {
             if (adaptive != null) {
                 for (i in 0 until adaptive.length()) {
                     val f = adaptive.getJSONObject(i)
-                    val url = f.optString("url", "")
+                    var url = f.optString("url", "")
+                    if (url.isBlank()) {
+                        val cipher = f.optString("cipher", f.optString("signatureCipher", ""))
+                        if (cipher.isNotBlank()) {
+                            val m = Regex("""url=([^&]+)""").find(cipher)
+                            if (m != null) try { url = java.net.URLDecoder.decode(m.groupValues[1], "UTF-8") } catch (_: Exception) {}
+                        }
+                    }
                     if (url.isBlank()) continue
                     val mime = f.optString("mimeType", "")
                     if (mime.contains("video")) {
                         val quality = f.optString("qualityLabel", "")
-                        if (quality.isBlank()) continue // video-only kalitesizleri atla, muxed zaten var
+                        if (quality.isBlank()) continue
                         val ext = if (mime.contains("webm")) "webm" else "mp4"
-                        // Video-only'yi ekleme - sadece muxed sunuyoruz, video-only ses gerektirir
-                        // Ama en yüksek kalite için ekleyelim, kullanıcı isterse sadece görüntü indirebilir
-                        // streams.add(StreamOption("$quality • $ext (görüntü)", ext, quality, url, true, false))
+                        // Video-only - yüksek kaliteler (1080p, 4K) genelde sadece burada, ses ayrı
+                        // Kullanıcıya göster, indirince sessiz olabilir uyarısı bottom sheet'te zaten var
+                        // Ama 720p ve üzeri için ekle
+                        if (extractQualityNumber(quality) >= 720) {
+                            streams.add(StreamOption("$quality • ${ext.uppercase()} (video-only)", ext, quality, url, true, false))
+                        }
                     } else if (mime.contains("audio")) {
                         val bitrate = f.optInt("bitrate", 0) / 1000
                         val ext = when {

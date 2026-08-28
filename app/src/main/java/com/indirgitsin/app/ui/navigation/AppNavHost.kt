@@ -36,7 +36,7 @@ fun AppNavHost(
                 inputUrl = inputUrl,
                 onInputChange = homeViewModel::onInputChange,
                 uiState = uiState,
-                onFetch = { homeViewModel.fetch(inputUrl) },
+                onFetch = { url -> homeViewModel.fetch(url) },
                 onDownload = onDownload,
                 onPaste = { /* handled in MainActivity */ },
                 historyDao = historyDao,
