@@ -64,7 +64,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     // zemer-cipher: YouTube cipher + PoToken (JitPack)
-    implementation("com.zemer:cipher:master-SNAPSHOT")
+    implementation("com.zemer:cipher:1.0.0")
 
     // DataStore (ayarlar)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
