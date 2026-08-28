@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 
 class HomeViewModel : ViewModel() {
 
+    var historyDao: com.indirgitsin.app.data.history.HistoryDao? = null
+
     private val _inputUrl = MutableStateFlow("")
     val inputUrl: StateFlow<String> = _inputUrl
 
@@ -45,6 +47,20 @@ class HomeViewModel : ViewModel() {
                     _uiState.value = UiState.Error("Video bulundu ama indirilebilir akış bulunamadı. Farklı bir video dene.")
                 } else {
                     _uiState.value = UiState.Success(video)
+                    // Geçmişe kaydet (premium: otomatik, gizli)
+                    try {
+                        historyDao?.insert(
+                            com.indirgitsin.app.data.history.HistoryEntity(
+                                videoId = video.id,
+                                title = video.title,
+                                author = video.author,
+                                thumbnailUrl = video.thumbnailUrl,
+                                durationSeconds = video.durationSeconds,
+                                viewCount = video.viewCount,
+                                url = video.url
+                            )
+                        )
+                    } catch (_: Exception) {}
                 }
             }.onFailure { e ->
                 _uiState.value = UiState.Error(e.message ?: "Bilinmeyen hata oluştu")

@@ -24,7 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import com.indirgitsin.app.data.history.HistoryDao
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.UiState
 import com.indirgitsin.app.data.model.VideoInfo
@@ -38,7 +42,9 @@ fun HomeScreen(
     uiState: UiState,
     onFetch: () -> Unit,
     onDownload: (VideoInfo, StreamOption) -> Unit,
-    onPaste: () -> Unit
+    onPaste: () -> Unit,
+    historyDao: HistoryDao? = null,
+    onHistoryClick: (String) -> Unit = {}
 ) {
     var showSheet by remember { mutableStateOf(false) }
     var selectedVideo by remember { mutableStateOf<VideoInfo?>(null) }
@@ -50,6 +56,18 @@ fun HomeScreen(
             showSheet = true
             selectedTab = 0
         }
+    }
+
+    val context = LocalContext.current
+    val doPaste = {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val text = cm?.primaryClip?.getItemAt(0)?.text?.toString()
+        val url = YoutubeLinkHelper.findYoutubeUrlInText(text) ?: text
+        if (!url.isNullOrBlank()) {
+            onInputChange(url)
+            if (YoutubeLinkHelper.isValidYoutubeUrl(url)) onFetch()
+        }
+        onPaste()
     }
 
     Scaffold(
@@ -81,7 +99,7 @@ fun HomeScreen(
         ) {
             item { HeroCard() }
 
-            item { InputCard(inputUrl, onInputChange, onFetch, onPaste) }
+            item { InputCard(inputUrl, onInputChange, onFetch, doPaste) }
 
             item {
                 AnimatedContent(targetState = uiState, transitionSpec = {
@@ -98,7 +116,7 @@ fun HomeScreen(
 
             item { HowItWorksSection() }
 
-            item { RecentSection() }
+            item { RecentSection(historyDao, onHistoryClick) }
 
             item {
                 Text(
@@ -336,19 +354,37 @@ private fun RowScope.HowItWorksStep(number: String, title: String, desc: String,
 }
 
 @Composable
-private fun RecentSection() {
+private fun RecentSection(historyDao: HistoryDao?, onHistoryClick: (String) -> Unit) {
+    var recent by remember { mutableStateOf<List<com.indirgitsin.app.data.history.HistoryEntity>>(emptyList()) }
+    LaunchedEffect(historyDao) {
+        historyDao?.observeHistory()?.collect { recent = it.take(5) }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("Son denediklerin", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = {}) { Text("Temizle", style = MaterialTheme.typography.labelSmall) }
+            if (recent.isNotEmpty() && historyDao != null) {
+                val scope = rememberCoroutineScope()
+                TextButton(onClick = { scope.launch(kotlinx.coroutines.Dispatchers.IO) { historyDao.clearAll() } }) { Text("Temizle", style = MaterialTheme.typography.labelSmall) }
+            }
         }
-        // Boş durumda placeholder chip'ler
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = {}, label = { Text("youtu.be/dQw4w...") }, leadingIcon = { Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.size(16.dp)) })
-            AssistChip(onClick = {}, label = { Text("music.youtu.be/...") }, leadingIcon = { Icon(Icons.Rounded.MusicNote, contentDescription = null, modifier = Modifier.size(16.dp)) })
+        if (recent.isEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(onClick = {}, label = { Text("youtu.be/dQw4w...") }, leadingIcon = { Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.size(16.dp)) })
+                AssistChip(onClick = {}, label = { Text("music.youtu.be/...") }, leadingIcon = { Icon(Icons.Rounded.MusicNote, contentDescription = null, modifier = Modifier.size(16.dp)) })
+            }
+            Text("Geçmiş cihazında saklanır, gizlidir.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                recent.forEach { item ->
+                    SuggestionChip(
+                        onClick = { onHistoryClick(item.url) },
+                        label = { Text(item.title.take(28) + "…", maxLines = 1) },
+                        icon = { Icon(Icons.Rounded.History, null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+            }
         }
-        Text("Geçmiş cihazında saklanır, gizlidir.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
