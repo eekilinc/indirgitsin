@@ -617,7 +617,7 @@ object YoutubeExtractor {
                     if (mime.contains("audio")) {
                         val bitrate = f.optInt("bitrate", 0) / 1000
                         val ext = if (mime.contains("webm")) "webm" else "m4a"
-                        streams.add(StreamOption("Ses • ${ext.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(), ext, if (bitrate>0) "${bitrate}kbps" else "", url, false, true, bitrate))
+                        streams.add(StreamOption("Ses • ${ext.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(), ext, if (bitrate>0) "${bitrate}kbps" else "", url, false, true, bitrate = bitrate))
                     }
                 }
             }
