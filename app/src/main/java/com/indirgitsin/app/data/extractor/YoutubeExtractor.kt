@@ -86,13 +86,6 @@ object YoutubeExtractor {
                 return@withContext Result.success(watchPage)
             }
 
-            // 6) get_video_info fallback (eski ama hala bazı videolarda işe yarıyor)
-            val gvi = withTimeoutOrNull(7000) { tryGetVideoInfo(videoId) }
-            if (gvi != null) {
-                synchronized(cache) { cache[videoId] = gvi; cacheTime[videoId] = System.currentTimeMillis() }
-                return@withContext Result.success(gvi)
-            }
-
             val oembed = tryOEmbed(videoId)
             if (oembed != null) {
                 return@withContext Result.failure(
@@ -200,6 +193,9 @@ object YoutubeExtractor {
 
             val streamingData = json.optJSONObject("streamingData") ?: return null
             val streams = mutableListOf<StreamOption>()
+            val serverAbr = streamingData.optString("serverAbrStreamingUrl", "")
+            val hls = streamingData.optString("hlsManifestUrl", "")
+            val sabrVideo = serverAbr.isNotBlank() && streamingData.optJSONArray("formats")?.length() == 0
 
             // Muxed formats (video+audio birlikte) - en kolay indirilen
             val formats = streamingData.optJSONArray("formats")
@@ -227,6 +223,7 @@ object YoutubeExtractor {
             }
 
             // Adaptive - video only ve audio only
+            // SABR videolarinda adaptiveFormats metadata-only: url/cipher yok, itag + initRange/indexRange var
             val adaptive = streamingData.optJSONArray("adaptiveFormats")
             if (adaptive != null) {
                 for (i in 0 until adaptive.length()) {
@@ -239,20 +236,22 @@ object YoutubeExtractor {
                             if (m != null) try { url = java.net.URLDecoder.decode(m.groupValues[1], "UTF-8") } catch (_: Exception) {}
                         }
                     }
-                    if (url.isBlank()) continue
                     val mime = f.optString("mimeType", "")
+                    val quality = f.optString("qualityLabel", "")
+                    val itag = f.optString("itag", "")
+                    val bitrate = f.optInt("bitrate", 0) / 1000
+                    // SABR: url yok ama itag var -> serverAbr + itag ile URL yap
+                    val isSabr = url.isBlank() && itag.isNotBlank() && serverAbr.isNotBlank()
+                    if (isSabr) {
+                        url = serverAbr + "&itag=" + itag
+                    }
+                    if (url.isBlank()) continue
                     if (mime.contains("video")) {
-                        val quality = f.optString("qualityLabel", "")
                         if (quality.isBlank()) continue
                         val ext = if (mime.contains("webm")) "webm" else "mp4"
-                        // Video-only - yüksek kaliteler (1080p, 4K) genelde sadece burada, ses ayrı
-                        // Kullanıcıya göster, indirince sessiz olabilir uyarısı bottom sheet'te zaten var
-                        // Ama 720p ve üzeri için ekle
-                        if (extractQualityNumber(quality) >= 720) {
-                            streams.add(StreamOption("$quality • ${ext.uppercase()} (video-only)", ext, quality, url, true, false))
-                        }
+                        val label = if (sabrVideo && quality.isNotBlank()) "$quality • ${ext.uppercase()}" else "$quality • ${ext.uppercase()} (video-only)"
+                        streams.add(StreamOption(label, ext, quality, url, true, false))
                     } else if (mime.contains("audio")) {
-                        val bitrate = f.optInt("bitrate", 0) / 1000
                         val ext = when {
                             mime.contains("webm") || mime.contains("opus") -> "webm"
                             mime.contains("mp4") -> "m4a"
@@ -274,11 +273,8 @@ object YoutubeExtractor {
                 }
             }
 
-            // SABR / HLS fallback - yeni YouTube videoları serverAbr kullanıyor (8b_3-c0UJLY gibi)
-            val serverAbr = streamingData.optString("serverAbrStreamingUrl", "")
-            val hls = streamingData.optString("hlsManifestUrl", "")
+            // SABR fallback (eğer hic bir stream yoksa ve serverAbr varsa)
             if (streams.isEmpty() && serverAbr.isNotBlank()) {
-                // SABR manifest URL'i doğrudan HLS/DASH olarak ekle - ExoPlayer oynatabilir, DownloadManager indirebilir
                 streams.add(StreamOption("SABR • Auto (YouTube)", "mp4", "auto", serverAbr, true, false))
             } else if (streams.isEmpty() && hls.isNotBlank()) {
                 streams.add(StreamOption("Canlı/HLS • M3U8", "m3u8", "auto", hls, true, false))
@@ -706,20 +702,19 @@ object YoutubeExtractor {
             val views = videoDetails.optString("viewCount", "0").toLongOrNull() ?: 0L
             val streamingData = json.optJSONObject("streamingData") ?: return null
             val streams = mutableListOf<StreamOption>()
+            val serverAbr = streamingData.optString("serverAbrStreamingUrl", "")
+            val hls = streamingData.optString("hlsManifestUrl", "")
+            val sabrVideo = serverAbr.isNotBlank() && streamingData.optJSONArray("formats")?.length() == 0
             val formats = streamingData.optJSONArray("formats")
             if (formats != null) {
                 for (i in 0 until formats.length()) {
                     val f = formats.getJSONObject(i)
-                    // url veya cipher olabilir
                     var url = f.optString("url", "")
                     if (url.isBlank()) {
                         val cipher = f.optString("cipher", f.optString("signatureCipher", ""))
                         if (cipher.isNotBlank()) {
-                            // cipher içinde url=... kısmını decode et, signature'ı çözmeden direkt url'yi almayı dene
                             val urlMatch = Regex("""url=([^&]+)""").find(cipher)
-                            if (urlMatch != null) {
-                                url = java.net.URLDecoder.decode(urlMatch.groupValues[1], "UTF-8")
-                            }
+                            if (urlMatch != null) url = java.net.URLDecoder.decode(urlMatch.groupValues[1], "UTF-8")
                         }
                     }
                     if (url.isBlank()) continue
@@ -741,19 +736,27 @@ object YoutubeExtractor {
                             if (urlMatch != null) url = java.net.URLDecoder.decode(urlMatch.groupValues[1], "UTF-8")
                         }
                     }
-                    if (url.isBlank()) continue
                     val mime = f.optString("mimeType", "")
-                    if (mime.contains("audio")) {
-                        val bitrate = f.optInt("bitrate", 0) / 1000
+                    val itag = f.optString("itag", "")
+                    val bitrate = f.optInt("bitrate", 0) / 1000
+                    val isSabr = url.isBlank() && itag.isNotBlank() && serverAbr.isNotBlank()
+                    if (isSabr) {
+                        url = serverAbr + "&itag=" + itag
+                    }
+                    if (url.isBlank()) continue
+                    if (mime.contains("video")) {
+                        val quality = f.optString("qualityLabel", "")
+                        if (quality.isBlank()) continue
+                        val ext = if (mime.contains("webm")) "webm" else "mp4"
+                        val label = if (sabrVideo) "$quality • ${ext.uppercase()}" else "$quality • ${ext.uppercase()} (web)"
+                        streams.add(StreamOption(label, ext, quality, url, true, false))
+                    } else if (mime.contains("audio")) {
                         val ext = if (mime.contains("webm")) "webm" else "m4a"
-                        streams.add(StreamOption("Ses • ${ext.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(), ext, if (bitrate>0) "${bitrate}kbps" else "", url, false, true, sizeApprox = "", bitrate = bitrate))
+                        streams.add(StreamOption("Ses • ${ext.uppercase()} ${if (bitrate > 0) "${bitrate}kbps" else ""}".trim(), ext, if (bitrate > 0) "${bitrate}kbps" else "", url, false, true, sizeApprox = "", bitrate = bitrate))
                     }
                 }
             }
-            // SABR fallback - serverAbrStreamingUrl doğrudan DASH manifest
             if (streams.isEmpty()) {
-                val serverAbr = streamingData.optString("serverAbrStreamingUrl", "")
-                val hls = streamingData.optString("hlsManifestUrl", "")
                 when {
                     serverAbr.isNotBlank() -> {
                         streams.add(StreamOption("SABR • Auto (YouTube)", "mp4", "auto", serverAbr, true, false))
@@ -766,84 +769,6 @@ object YoutubeExtractor {
             if (streams.isEmpty()) return null
             val sorted = streams.distinctBy { it.url }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) })
             VideoInfo(videoId, title, author, thumb, duration, views, "https://www.youtube.com/watch?v=$videoId", sorted)
-        } catch (_: Exception) { null }
-    }
-
-    private fun tryGetVideoInfo(videoId: String): VideoInfo? {
-        return try {
-            val url = "https://www.youtube.com/get_video_info?video_id=$videoId&el=detailpage&ps=default&eurl=&gl=US&hl=en"
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .build()
-            val resp = client.newCall(req).execute()
-            if (!resp.isSuccessful) {
-                resp.close()
-                return null
-            }
-            val body = resp.body?.string()
-            resp.close()
-            if (body.isNullOrBlank() || !body.contains("player_response")) return null
-            // player_response=...&... parse
-            val params = body.split("&").associate { it.split("=", limit = 2).let { p -> p[0] to (if (p.size > 1) java.net.URLDecoder.decode(p[1], "UTF-8") else "") } }
-            val playerResponseStr = params["player_response"] ?: return null
-            val json = JSONObject(playerResponseStr)
-            val videoDetails = json.optJSONObject("videoDetails") ?: return null
-            val title = videoDetails.optString("title", "Bilinmeyen Başlık")
-            val author = videoDetails.optString("author", "Bilinmeyen Kanal")
-            val thumb = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
-            val duration = videoDetails.optString("lengthSeconds", "0").toLongOrNull() ?: 0L
-            val views = videoDetails.optString("viewCount", "0").toLongOrNull() ?: 0L
-            val streamingData = json.optJSONObject("streamingData") ?: return null
-            val streams = mutableListOf<StreamOption>()
-            val formats = streamingData.optJSONArray("formats")
-            if (formats != null) {
-                for (i in 0 until formats.length()) {
-                    val f = formats.getJSONObject(i)
-                    var u = f.optString("url", "")
-                    if (u.isBlank()) {
-                        val cipher = f.optString("cipher", f.optString("signatureCipher", ""))
-                        if (cipher.isNotBlank()) {
-                            val m = Regex("""url=([^&]+)""").find(cipher)
-                            if (m != null) u = java.net.URLDecoder.decode(m.groupValues[1], "UTF-8")
-                        }
-                    }
-                    if (u.isBlank()) continue
-                    val q = f.optString("qualityLabel", f.optString("quality", ""))
-                    val mime = f.optString("mimeType", "video/mp4")
-                    val ext = if (mime.contains("webm")) "webm" else "mp4"
-                    streams.add(StreamOption("$q • ${ext.uppercase()}", ext, q, u, true, false))
-                }
-            }
-            val adaptive = streamingData.optJSONArray("adaptiveFormats")
-            if (adaptive != null) {
-                for (i in 0 until adaptive.length()) {
-                    val f = adaptive.getJSONObject(i)
-                    var u = f.optString("url", "")
-                    if (u.isBlank()) {
-                        val cipher = f.optString("cipher", f.optString("signatureCipher", ""))
-                        if (cipher.isNotBlank()) {
-                            val m = Regex("""url=([^&]+)""").find(cipher)
-                            if (m != null) u = java.net.URLDecoder.decode(m.groupValues[1], "UTF-8")
-                        }
-                    }
-                    if (u.isBlank()) continue
-                    val mime = f.optString("mimeType", "")
-                    if (mime.contains("audio")) {
-                        val br = f.optInt("bitrate", 0) / 1000
-                        val ext = if (mime.contains("webm")) "webm" else "m4a"
-                        streams.add(StreamOption("Ses • ${ext.uppercase()} ${if (br>0) "${br}kbps" else ""}".trim(), ext, if (br>0) "${br}kbps" else "", u, false, true, sizeApprox = "", bitrate = br))
-                    }
-                }
-            }
-            if (streams.isEmpty()) {
-                val hls = streamingData.optString("hlsManifestUrl", "")
-                if (hls.isNotBlank()) streams.add(StreamOption("HLS • M3U8", "m3u8", "auto", hls, true, false))
-                val sabr = streamingData.optString("serverAbrStreamingUrl", "")
-                if (streams.isEmpty() && sabr.isNotBlank()) streams.add(StreamOption("SABR • Auto", "mp4", "auto", sabr, true, false))
-            }
-            if (streams.isEmpty()) return null
-            VideoInfo(videoId, title, author, thumb, duration, views, "https://www.youtube.com/watch?v=$videoId", streams.distinctBy { it.url })
         } catch (_: Exception) { null }
     }
 
