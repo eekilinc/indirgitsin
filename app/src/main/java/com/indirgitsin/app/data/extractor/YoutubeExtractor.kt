@@ -502,16 +502,101 @@ object YoutubeExtractor {
     }
 
     private fun tryCobalt(videoId: String): VideoInfo? {
-        // Cobalt API - doğrudan YouTube linkini ver, o stream URL döndürür
-        // 3 endpoint dene
         val endpoints = listOf("https://api.cobalt.tools/api/json", "https://co.wuk.sh/api/json", "https://cobalt-api.kwiatekmiki.com/api/json")
+        val ytUrl = "https://www.youtube.com/watch?v=$videoId"
+        for (endpoint in endpoints) {
+            try {
+                // 1) Video için dene
+                val videoBody = JSONObject().apply {
+                    put("url", ytUrl)
+                    put("vQuality", "1080")
+                }.toString()
+                val videoReq = Request.Builder()
+                    .url(endpoint)
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent", "Mozilla/5.0")
+                    .post(videoBody.toRequestBody("application/json".toMediaType()))
+                    .build()
+                var videoUrl: String? = null
+                var videoJson: JSONObject? = null
+                client.newCall(videoReq).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string()
+                        if (!body.isNullOrBlank()) {
+                            videoJson = JSONObject(body)
+                            val status = videoJson!!.optString("status", "")
+                            if (status == "tunnel" || status == "redirect") {
+                                videoUrl = videoJson!!.optString("url", "")
+                            } else if (status == "picker") {
+                                val picker = videoJson!!.optJSONArray("picker")
+                                if (picker != null && picker.length() > 0) {
+                                    videoUrl = picker.getJSONObject(0).optString("url", "")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2) Audio için dene (ayrı istek)
+                var audioUrl: String? = null
+                try {
+                    val audioBody = JSONObject().apply {
+                        put("url", ytUrl)
+                        put("isAudioOnly", true)
+                        put("aFormat", "mp3")
+                    }.toString()
+                    val audioReq = Request.Builder()
+                        .url(endpoint)
+                        .header("Accept", "application/json")
+                        .header("Content-Type", "application/json")
+                        .header("User-Agent", "Mozilla/5.0")
+                        .post(audioBody.toRequestBody("application/json".toMediaType()))
+                        .build()
+                    client.newCall(audioReq).execute().use { resp ->
+                        if (resp.isSuccessful) {
+                            val body = resp.body?.string()
+                            if (!body.isNullOrBlank()) {
+                                val j = JSONObject(body)
+                                val s = j.optString("status", "")
+                                if (s == "tunnel" || s == "redirect") audioUrl = j.optString("url", "")
+                                else if (s == "picker") {
+                                    val p = j.optJSONArray("picker")
+                                    if (p != null && p.length() > 0) audioUrl = p.getJSONObject(0).optString("url", "")
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                if (videoUrl.isNullOrBlank() && audioUrl.isNullOrBlank()) continue
+
+                val oembed = tryOEmbed(videoId)
+                val title = oembed?.title ?: videoJson?.optString("text", "")?.takeIf { it.isNotBlank() } ?: "YouTube Video $videoId"
+                val author = oembed?.author ?: "Bilinmeyen Kanal"
+                val thumb = oembed?.thumbnailUrl ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+                val streams = mutableListOf<StreamOption>()
+                if (!videoUrl.isNullOrBlank()) {
+                    streams.add(StreamOption("1080p • MP4 (Cobalt)", "mp4", "1080p", videoUrl!!, true, false))
+                    streams.add(StreamOption("720p • MP4 (Cobalt)", "mp4", "720p", videoUrl!!, true, false))
+                }
+                if (!audioUrl.isNullOrBlank()) {
+                    streams.add(StreamOption("Ses • MP3 128kbps (Cobalt)", "mp3", "128kbps", audioUrl!!, false, true, bitrate = 128))
+                } else if (!videoUrl.isNullOrBlank()) {
+                    // Audio yoksa video URL'i ses olarak da kullan (muxed)
+                    streams.add(StreamOption("Ses • M4A (Cobalt)", "m4a", "128kbps", videoUrl!!, false, true, bitrate = 128))
+                }
+                if (streams.isNotEmpty()) {
+                    return VideoInfo(videoId, title, author, thumb, 0, 0, ytUrl, streams)
+                }
+            } catch (_: Exception) { continue }
+        }
+        // Eski picker fallback (tek istek)
         for (endpoint in endpoints) {
             try {
                 val jsonBody = JSONObject().apply {
                     put("url", "https://www.youtube.com/watch?v=$videoId")
-                    put("vQuality", "1080")
-                    put("aFormat", "mp3")
-                    put("isAudioOnly", false)
+                    put("vQuality", "720")
                 }.toString()
                 val req = Request.Builder()
                     .url(endpoint)
@@ -530,17 +615,15 @@ object YoutubeExtractor {
                 if (body.isNullOrBlank()) continue
                 val json = JSONObject(body)
                 val status = json.optString("status", "")
-                // tunnel = doğrudan url, redirect = url, picker = birden fazla
                 val url = json.optString("url", "")
                 if (status == "tunnel" || status == "redirect") {
                     if (url.isBlank()) continue
-                    // Cobalt'tan gelen URL'i tek seçenek olarak döndür, oEmbed'den başlık al
                     val oembed = tryOEmbed(videoId)
                     val title = oembed?.title ?: "YouTube Video $videoId"
                     val author = oembed?.author ?: "Bilinmeyen Kanal"
                     val thumb = oembed?.thumbnailUrl ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
                     val streams = listOf(
-                        StreamOption("1080p • MP4 (Cobalt)", "mp4", "1080p", url, true, false),
+                        StreamOption("720p • MP4 (Cobalt)", "mp4", "720p", url, true, false),
                         StreamOption("Ses • M4A (Cobalt)", "m4a", "128kbps", url, false, true, bitrate = 128)
                     )
                     return VideoInfo(videoId, title, author, thumb, 0, 0, "https://www.youtube.com/watch?v=$videoId", streams)
