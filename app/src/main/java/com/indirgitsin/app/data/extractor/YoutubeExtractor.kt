@@ -17,7 +17,6 @@ object YoutubeExtractor {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    // Piped instance'ları - biri down olursa diğerini dener
     private val pipedInstances = listOf(
         "https://pipedapi.kavin.rocks",
         "https://pipedapi.adminforge.de",
@@ -31,17 +30,13 @@ object YoutubeExtractor {
             val videoId = YoutubeLinkHelper.extractVideoId(normalized)
                 ?: return@withContext Result.failure(Exception("Geçersiz YouTube linki"))
 
-            // 1) Piped API dene (en güvenilir, cipher çözmeden stream URL verir)
-            var pipedResult = tryPiped(videoId)
+            val pipedResult = tryPiped(videoId)
             if (pipedResult != null) {
                 return@withContext Result.success(pipedResult)
             }
 
-            // 2) oEmbed fallback (başlık + thumbnail için) - stream olmadan
             val oembed = tryOEmbed(videoId)
             if (oembed != null) {
-                // oEmbed'de stream yok, ama kullanıcıya bilgi göster + hata mesajı yerine boş stream ile dön
-                // piped down ise kullanıcıya açık mesaj ver
                 return@withContext Result.failure(
                     Exception("Şu an Piped sunucularına ulaşılamıyor. Biraz sonra tekrar dene.\nVideo: ${oembed.title}")
                 )
@@ -60,101 +55,101 @@ object YoutubeExtractor {
                     .url("$base/streams/$videoId")
                     .header("User-Agent", "Mozilla/5.0")
                     .build()
-                client.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) continue
-                    val body = resp.body?.string() ?: continue
-                    val json = JSONObject(body)
-                    if (json.has("error")) continue
-
-                    val title = json.optString("title", "Bilinmeyen Başlık")
-                    val author = json.optString("uploader", json.optString("uploaderName", "Bilinmeyen Kanal"))
-                    val thumb = json.optString("thumbnailUrl", json.optJSONArray("thumbnails")?.optJSONObject(0)?.optString("url") ?: "")
-                    val duration = json.optLong("duration", 0L)
-                    val views = json.optLong("views", 0L)
-
-                    val streams = mutableListOf<StreamOption>()
-
-                    // videoStreams
-                    val vArr = json.optJSONArray("videoStreams")
-                    if (vArr != null) {
-                        for (i in 0 until vArr.length()) {
-                            val o = vArr.getJSONObject(i)
-                            val url = o.optString("url", "")
-                            if (url.isBlank()) continue
-                            val quality = o.optString("quality", "")
-                            val mime = o.optString("mimeType", "video/mp4")
-                            val ext = when {
-                                mime.contains("webm") -> "webm"
-                                mime.contains("mp4") -> "mp4"
-                                else -> "mp4"
-                            }
-                            streams.add(
-                                StreamOption(
-                                    label = "$quality • ${ext.uppercase()}",
-                                    extension = ext,
-                                    quality = quality,
-                                    url = url,
-                                    isVideo = true,
-                                    isAudioOnly = false
-                                )
-                            )
-                        }
-                    }
-
-                    // audioStreams
-                    val aArr = json.optJSONArray("audioStreams")
-                    if (aArr != null) {
-                        for (i in 0 until aArr.length()) {
-                            val o = aArr.getJSONObject(i)
-                            val url = o.optString("url", "")
-                            if (url.isBlank()) continue
-                            val mime = o.optString("mimeType", "audio/mp4")
-                            val ext = when {
-                                mime.contains("webm") -> "webm"
-                                mime.contains("mp4") || mime.contains("m4a") -> "m4a"
-                                mime.contains("mp3") -> "mp3"
-                                else -> "m4a"
-                            }
-                            val bitrate = o.optInt("bitrate", 0)
-                            val quality = if (bitrate > 0) "${bitrate}kbps" else o.optString("quality", "")
-                            streams.add(
-                                StreamOption(
-                                    label = "Ses • ${ext.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(),
-                                    extension = ext,
-                                    quality = quality,
-                                    url = url,
-                                    isVideo = false,
-                                    isAudioOnly = true,
-                                    bitrate = bitrate
-                                )
-                            )
-                        }
-                    }
-
-                    // hls fallback
-                    val hls = json.optString("hls", "")
-                    if (streams.isEmpty() && hls.isNotBlank()) {
-                        streams.add(StreamOption("HLS • M3U8", "m3u8", "auto", hls, true, false))
-                    }
-
-                    if (streams.isEmpty()) continue
-
-                    // Sırala: video önce, sonra ses bitrate'e göre
-                    val sorted = streams.distinctBy { it.url }.sortedWith(
-                        compareBy<StreamOption> { !it.isVideo }.thenByDescending { it.bitrate }
-                    )
-
-                    return VideoInfo(
-                        id = videoId,
-                        title = title,
-                        author = author,
-                        thumbnailUrl = thumb,
-                        durationSeconds = duration,
-                        viewCount = views,
-                        url = "https://www.youtube.com/watch?v=$videoId",
-                        streams = sorted
-                    )
+                val resp = client.newCall(req).execute()
+                if (!resp.isSuccessful) {
+                    resp.close()
+                    continue
                 }
+                val body = resp.body?.string()
+                resp.close()
+                if (body.isNullOrBlank()) continue
+                val json = JSONObject(body)
+                if (json.has("error")) continue
+
+                val title = json.optString("title", "Bilinmeyen Başlık")
+                val author = json.optString("uploader", json.optString("uploaderName", "Bilinmeyen Kanal"))
+                val thumb = json.optString("thumbnailUrl", json.optJSONArray("thumbnails")?.optJSONObject(0)?.optString("url") ?: "")
+                val duration = json.optLong("duration", 0L)
+                val views = json.optLong("views", 0L)
+
+                val streams = mutableListOf<StreamOption>()
+
+                val vArr = json.optJSONArray("videoStreams")
+                if (vArr != null) {
+                    for (i in 0 until vArr.length()) {
+                        val o = vArr.getJSONObject(i)
+                        val url = o.optString("url", "")
+                        if (url.isBlank()) continue
+                        val quality = o.optString("quality", "")
+                        val mime = o.optString("mimeType", "video/mp4")
+                        val ext = when {
+                            mime.contains("webm") -> "webm"
+                            mime.contains("mp4") -> "mp4"
+                            else -> "mp4"
+                        }
+                        streams.add(
+                            StreamOption(
+                                label = "$quality • ${ext.uppercase()}",
+                                extension = ext,
+                                quality = quality,
+                                url = url,
+                                isVideo = true,
+                                isAudioOnly = false
+                            )
+                        )
+                    }
+                }
+
+                val aArr = json.optJSONArray("audioStreams")
+                if (aArr != null) {
+                    for (i in 0 until aArr.length()) {
+                        val o = aArr.getJSONObject(i)
+                        val url = o.optString("url", "")
+                        if (url.isBlank()) continue
+                        val mime = o.optString("mimeType", "audio/mp4")
+                        val ext = when {
+                            mime.contains("webm") -> "webm"
+                            mime.contains("mp4") || mime.contains("m4a") -> "m4a"
+                            mime.contains("mp3") -> "mp3"
+                            else -> "m4a"
+                        }
+                        val bitrate = o.optInt("bitrate", 0)
+                        val quality = if (bitrate > 0) "${bitrate}kbps" else o.optString("quality", "")
+                        streams.add(
+                            StreamOption(
+                                label = "Ses • ${ext.uppercase()} ${if (bitrate > 0) "${bitrate}kbps" else ""}".trim(),
+                                extension = ext,
+                                quality = quality,
+                                url = url,
+                                isVideo = false,
+                                isAudioOnly = true,
+                                bitrate = bitrate
+                            )
+                        )
+                    }
+                }
+
+                val hls = json.optString("hls", "")
+                if (streams.isEmpty() && hls.isNotBlank()) {
+                    streams.add(StreamOption("HLS • M3U8", "m3u8", "auto", hls, true, false))
+                }
+
+                if (streams.isEmpty()) continue
+
+                val sorted = streams.distinctBy { it.url }.sortedWith(
+                    compareBy<StreamOption> { !it.isVideo }.thenByDescending { it.bitrate }
+                )
+
+                return VideoInfo(
+                    id = videoId,
+                    title = title,
+                    author = author,
+                    thumbnailUrl = thumb,
+                    durationSeconds = duration,
+                    viewCount = views,
+                    url = "https://www.youtube.com/watch?v=$videoId",
+                    streams = sorted
+                )
             } catch (_: Exception) {
                 continue
             }
@@ -166,21 +161,25 @@ object YoutubeExtractor {
         return try {
             val url = "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=$videoId&format=json"
             val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val json = JSONObject(body)
-                VideoInfo(
-                    id = videoId,
-                    title = json.optString("title", "Bilinmeyen Başlık"),
-                    author = json.optString("author_name", "Bilinmeyen Kanal"),
-                    thumbnailUrl = json.optString("thumbnail_url", "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"),
-                    durationSeconds = 0,
-                    viewCount = 0,
-                    url = "https://www.youtube.com/watch?v=$videoId",
-                    streams = emptyList()
-                )
+            val resp = client.newCall(req).execute()
+            if (!resp.isSuccessful) {
+                resp.close()
+                return null
             }
+            val body = resp.body?.string()
+            resp.close()
+            if (body.isNullOrBlank()) return null
+            val json = JSONObject(body)
+            VideoInfo(
+                id = videoId,
+                title = json.optString("title", "Bilinmeyen Başlık"),
+                author = json.optString("author_name", "Bilinmeyen Kanal"),
+                thumbnailUrl = json.optString("thumbnail_url", "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"),
+                durationSeconds = 0,
+                viewCount = 0,
+                url = "https://www.youtube.com/watch?v=$videoId",
+                streams = emptyList()
+            )
         } catch (_: Exception) { null }
     }
 }

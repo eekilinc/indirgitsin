@@ -176,7 +176,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HowItWorksStep(number: String, title: String, desc: String) {
+private fun RowScope.HowItWorksStep(number: String, title: String, desc: String) {
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.weight(1f)) {
         Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(32.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
