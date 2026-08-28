@@ -51,7 +51,7 @@ object YoutubeExtractor {
                 }
             }
 
-            // 1) Innertube - en güvenilir, doğrudan YouTube
+            // 1) Innertube (4 client)
             val innertube = withTimeoutOrNull(8000) { tryInnertube(videoId) }
             if (innertube != null) {
                 synchronized(cache) { cache[videoId] = innertube; cacheTime[videoId] = System.currentTimeMillis() }
@@ -72,10 +72,24 @@ object YoutubeExtractor {
                 return@withContext Result.success(invidious)
             }
 
+            // 4) Cobalt API (en sağlam 3. parti, doğrudan indir linki verir)
+            val cobalt = withTimeoutOrNull(7000) { tryCobalt(videoId) }
+            if (cobalt != null) {
+                synchronized(cache) { cache[videoId] = cobalt; cacheTime[videoId] = System.currentTimeMillis() }
+                return@withContext Result.success(cobalt)
+            }
+
+            // 5) Watch page ytInitialPlayerResponse parse (son çare, YouTube HTML)
+            val watchPage = withTimeoutOrNull(7000) { tryWatchPage(videoId) }
+            if (watchPage != null) {
+                synchronized(cache) { cache[videoId] = watchPage; cacheTime[videoId] = System.currentTimeMillis() }
+                return@withContext Result.success(watchPage)
+            }
+
             val oembed = tryOEmbed(videoId)
             if (oembed != null) {
                 return@withContext Result.failure(
-                    Exception("Kalite listesi alınamadı ama video bulundu: ${oembed.title}\nYouTube bu videoyu kısıtlamış olabilir. Farklı bir video dene veya 10 sn sonra tekrar dene.")
+                    Exception("Kalite listesi alınamadı ama video bulundu: ${oembed.title}\nYouTube bu videoyu geçici olarak kısıtlamış veya yaş sınırlı olabilir. Cobalt ve Piped de yanıt vermedi. 30 sn sonra tekrar dene veya farklı bir video dene.")
                 )
             }
 
@@ -467,6 +481,150 @@ object YoutubeExtractor {
         )
 
         return VideoInfo(videoId, title, author, thumb, duration, views, "https://www.youtube.com/watch?v=$videoId", sorted)
+    }
+
+    private fun tryCobalt(videoId: String): VideoInfo? {
+        // Cobalt API - doğrudan YouTube linkini ver, o stream URL döndürür
+        // 3 endpoint dene
+        val endpoints = listOf("https://api.cobalt.tools/api/json", "https://co.wuk.sh/api/json", "https://cobalt-api.kwiatekmiki.com/api/json")
+        for (endpoint in endpoints) {
+            try {
+                val jsonBody = JSONObject().apply {
+                    put("url", "https://www.youtube.com/watch?v=$videoId")
+                    put("vQuality", "1080")
+                    put("aFormat", "mp3")
+                    put("isAudioOnly", false)
+                }.toString()
+                val req = Request.Builder()
+                    .url(endpoint)
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent", "Mozilla/5.0")
+                    .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                    .build()
+                val resp = client.newCall(req).execute()
+                if (!resp.isSuccessful) {
+                    resp.close()
+                    continue
+                }
+                val body = resp.body?.string()
+                resp.close()
+                if (body.isNullOrBlank()) continue
+                val json = JSONObject(body)
+                val status = json.optString("status", "")
+                // tunnel = doğrudan url, redirect = url, picker = birden fazla
+                val url = json.optString("url", "")
+                if (status == "tunnel" || status == "redirect") {
+                    if (url.isBlank()) continue
+                    // Cobalt'tan gelen URL'i tek seçenek olarak döndür, oEmbed'den başlık al
+                    val oembed = tryOEmbed(videoId)
+                    val title = oembed?.title ?: "YouTube Video $videoId"
+                    val author = oembed?.author ?: "Bilinmeyen Kanal"
+                    val thumb = oembed?.thumbnailUrl ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+                    val streams = listOf(
+                        StreamOption("1080p • MP4 (Cobalt)", "mp4", "1080p", url, true, false),
+                        StreamOption("Ses • M4A (Cobalt)", "m4a", "128kbps", url, false, true, bitrate = 128)
+                    )
+                    return VideoInfo(videoId, title, author, thumb, 0, 0, "https://www.youtube.com/watch?v=$videoId", streams)
+                } else if (status == "picker") {
+                    val picker = json.optJSONArray("picker")
+                    if (picker != null && picker.length() > 0) {
+                        val first = picker.getJSONObject(0)
+                        val pUrl = first.optString("url", "")
+                        if (pUrl.isNotBlank()) {
+                            val oembed = tryOEmbed(videoId)
+                            return VideoInfo(
+                                videoId,
+                                oembed?.title ?: "YouTube Video $videoId",
+                                oembed?.author ?: "Bilinmeyen Kanal",
+                                oembed?.thumbnailUrl ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
+                                0, 0, "https://www.youtube.com/watch?v=$videoId",
+                                listOf(StreamOption("Video • MP4 (Cobalt)", "mp4", "720p", pUrl, true, false))
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) { continue }
+        }
+        return null
+    }
+
+    private fun tryWatchPage(videoId: String): VideoInfo? {
+        return try {
+            val req = Request.Builder()
+                .url("https://www.youtube.com/watch?v=$videoId&bpctr=9999999999&has_verified=1")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
+                .build()
+            val resp = client.newCall(req).execute()
+            if (!resp.isSuccessful) {
+                resp.close()
+                return null
+            }
+            val html = resp.body?.string()
+            resp.close()
+            if (html.isNullOrBlank()) return null
+            // ytInitialPlayerResponse içinden streamingData çek
+            val regex = Regex("""ytInitialPlayerResponse\s*=\s*(\{.+?\});""")
+            val match = regex.find(html) ?: return null
+            val jsonStr = match.groupValues[1]
+            val json = JSONObject(jsonStr)
+            val videoDetails = json.optJSONObject("videoDetails") ?: return null
+            val title = videoDetails.optString("title", "Bilinmeyen Başlık")
+            val author = videoDetails.optString("author", "Bilinmeyen Kanal")
+            val thumb = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+            val duration = videoDetails.optString("lengthSeconds", "0").toLongOrNull() ?: 0L
+            val views = videoDetails.optString("viewCount", "0").toLongOrNull() ?: 0L
+            val streamingData = json.optJSONObject("streamingData") ?: return null
+            val streams = mutableListOf<StreamOption>()
+            val formats = streamingData.optJSONArray("formats")
+            if (formats != null) {
+                for (i in 0 until formats.length()) {
+                    val f = formats.getJSONObject(i)
+                    // url veya cipher olabilir
+                    var url = f.optString("url", "")
+                    if (url.isBlank()) {
+                        val cipher = f.optString("cipher", f.optString("signatureCipher", ""))
+                        if (cipher.isNotBlank()) {
+                            // cipher içinde url=... kısmını decode et, signature'ı çözmeden direkt url'yi almayı dene
+                            val urlMatch = Regex("""url=([^&]+)""").find(cipher)
+                            if (urlMatch != null) {
+                                url = java.net.URLDecoder.decode(urlMatch.groupValues[1], "UTF-8")
+                            }
+                        }
+                    }
+                    if (url.isBlank()) continue
+                    val quality = f.optString("qualityLabel", f.optString("quality", ""))
+                    val mime = f.optString("mimeType", "video/mp4")
+                    val ext = if (mime.contains("webm")) "webm" else "mp4"
+                    streams.add(StreamOption("$quality • ${ext.uppercase()} (web)", ext, quality, url, true, false))
+                }
+            }
+            val adaptive = streamingData.optJSONArray("adaptiveFormats")
+            if (adaptive != null) {
+                for (i in 0 until adaptive.length()) {
+                    val f = adaptive.getJSONObject(i)
+                    var url = f.optString("url", "")
+                    if (url.isBlank()) {
+                        val cipher = f.optString("cipher", f.optString("signatureCipher", ""))
+                        if (cipher.isNotBlank()) {
+                            val urlMatch = Regex("""url=([^&]+)""").find(cipher)
+                            if (urlMatch != null) url = java.net.URLDecoder.decode(urlMatch.groupValues[1], "UTF-8")
+                        }
+                    }
+                    if (url.isBlank()) continue
+                    val mime = f.optString("mimeType", "")
+                    if (mime.contains("audio")) {
+                        val bitrate = f.optInt("bitrate", 0) / 1000
+                        val ext = if (mime.contains("webm")) "webm" else "m4a"
+                        streams.add(StreamOption("Ses • ${ext.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(), ext, if (bitrate>0) "${bitrate}kbps" else "", url, false, true, bitrate))
+                    }
+                }
+            }
+            if (streams.isEmpty()) return null
+            val sorted = streams.distinctBy { it.url }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) })
+            VideoInfo(videoId, title, author, thumb, duration, views, "https://www.youtube.com/watch?v=$videoId", sorted)
+        } catch (_: Exception) { null }
     }
 
     private fun extractQualityNumber(q: String): Int {
