@@ -33,9 +33,9 @@ class MainActivity : ComponentActivity() {
 
     private val vm: HomeViewModel by viewModels()
     private val bottomItems = listOf(
-        BottomItem(Screen.Home.route, "İndir", Icons.Rounded.Download, Icons.Rounded.Download),
-        BottomItem(Screen.History.route, "Geçmiş", Icons.Rounded.History, Icons.Rounded.History),
-        BottomItem(Screen.Settings.route, "Ayarlar", Icons.Rounded.Settings, Icons.Rounded.Settings)
+        BottomItem(Screen.Home.route, "Ana Sayfa", Icons.Rounded.Home, Icons.Rounded.Home),
+        BottomItem(Screen.History.route, "Kitaplık", Icons.Rounded.VideoLibrary, Icons.Rounded.VideoLibrary),
+        BottomItem(Screen.Settings.route, "Sen", Icons.Rounded.AccountCircle, Icons.Rounded.AccountCircle)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

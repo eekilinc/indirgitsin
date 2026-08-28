@@ -1,56 +1,50 @@
 package com.indirgitsin.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val PremiumDarkColors = darkColorScheme(
-    primary = PremiumRed,
+private val YtDarkColors = darkColorScheme(
+    primary = YtRed,
     onPrimary = Color.White,
-    primaryContainer = PremiumRedDark,
-    onPrimaryContainer = Color.White,
-    secondary = PremiumGold,
-    onSecondary = Color(0xFF1A1A1A),
-    background = BgDark,
-    onBackground = TextPrimaryDark,
-    surface = BgDarkSurface,
-    onSurface = TextPrimaryDark,
-    surfaceVariant = BgDarkCard,
-    onSurfaceVariant = TextSecondaryDark,
-    surfaceContainer = BgDarkCard,
-    surfaceContainerHighest = BgDarkElevated,
-    outline = BorderDark,
-    outlineVariant = Color(0xFF3A3A44),
+    primaryContainer = YtRedDark,
+    background = YtBackground,
+    onBackground = YtTextPrimary,
+    surface = YtBackground,
+    onSurface = YtTextPrimary,
+    surfaceVariant = YtSurfaceVariant,
+    onSurfaceVariant = YtTextSecondary,
+    surfaceContainer = YtSurface,
+    surfaceContainerHighest = YtElevated,
+    outline = YtBorder,
+    outlineVariant = Color(0xFF3F3F3F),
+    secondary = YtBlue,
+    onSecondary = Color.White,
     error = Color(0xFFFF4D6A),
-    errorContainer = Color(0xFF4A0F1A),
     scrim = Color.Black
 )
 
-private val PremiumLightColors = lightColorScheme(
-    primary = PremiumRed,
+private val YtLightColors = lightColorScheme(
+    primary = YtRed,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFDAD6),
-    background = BgLight,
-    onBackground = Color(0xFF1A1A1A),
-    surface = SurfaceLight,
-    onSurface = Color(0xFF1A1A1A),
-    surfaceVariant = CardLight,
-    onSurfaceVariant = Color(0xFF71717A),
-    outline = BorderLight,
-    outlineVariant = Color(0xFFE4E4E7),
-    error = Color(0xFFBA1A1A),
-    scrim = Color.Black
+    background = Color(0xFFF9F9F9),
+    onBackground = Color(0xFF0F0F0F),
+    surface = Color.White,
+    onSurface = Color(0xFF0F0F0F),
+    surfaceVariant = Color(0xFFF2F2F2),
+    onSurfaceVariant = Color(0xFF606060),
+    outline = Color(0xFFE5E5E5),
+    secondary = YtBlue
 )
 
 @Composable
 fun IndirGitsinTheme(
-    darkTheme: Boolean = true, // Premium: varsayılan koyu
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) PremiumDarkColors else PremiumLightColors
+    val colors = if (darkTheme) YtDarkColors else YtLightColors
     MaterialTheme(
         colorScheme = colors,
         typography = Typography,

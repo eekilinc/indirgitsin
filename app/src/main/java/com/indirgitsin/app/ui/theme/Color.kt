@@ -2,27 +2,31 @@ package com.indirgitsin.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Premium palette - Gece modu odaklı, sinematik
-val PremiumRed = Color(0xFFFF0033)
-val PremiumRedDark = Color(0xFFCC0029)
-val PremiumRedLight = Color(0xFFFF4D6A)
+// YouTube Premium - Gerçek YouTube koyu tema
+val YtRed = Color(0xFFFF0000)
+val YtRedDark = Color(0xFFCC0000)
+val YtBlue = Color(0xFF3EA6FF)
+val YtBackground = Color(0xFF0F0F0F) // YouTube koyu
+val YtSurface = Color(0xFF212121)
+val YtSurfaceVariant = Color(0xFF303030)
+val YtElevated = Color(0xFF3F3F3F)
+val YtTextPrimary = Color(0xFFF1F1F1)
+val YtTextSecondary = Color(0xFFAAAAAA)
+val YtTextTertiary = Color(0xFF717171)
+val YtBorder = Color(0xFF303030)
+val YtChipSelected = Color(0xFFF1F1F1)
+val YtChipUnselected = Color(0xFF272727)
+
+// Premium için korunanlar
 val PremiumGold = Color(0xFFFFD60A)
-val PremiumGoldDark = Color(0xFFFFC300)
 
-// Backgrounds - Derin siyah / lacivert siyah
-val BgDark = Color(0xFF0A0A0F)
-val BgDarkSurface = Color(0xFF15151A)
-val BgDarkCard = Color(0xFF1E1E24)
-val BgDarkElevated = Color(0xFF25252E)
-
-// Lights
-val BgLight = Color(0xFFF8F9FA)
-val SurfaceLight = Color(0xFFFFFFFF)
-val CardLight = Color(0xFFF1F2F3)
-
-val TextPrimaryDark = Color(0xFFFFFFFF)
-val TextSecondaryDark = Color(0xFFA1A1AA)
-val TextTertiaryDark = Color(0xFF71717A)
-
-val BorderDark = Color(0xFF2A2A32)
-val BorderLight = Color(0xFFE4E4E7)
+// Geriye dönük uyumluluk
+val PremiumRed = YtRed
+val PremiumRedDark = YtRedDark
+val BgDark = YtBackground
+val BgDarkSurface = YtSurface
+val BgDarkCard = YtSurfaceVariant
+val BgDarkElevated = YtElevated
+val TextPrimaryDark = YtTextPrimary
+val TextSecondaryDark = YtTextSecondary
+val BorderDark = YtBorder
