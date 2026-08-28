@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
                     vm.pendingUrl.collect { url ->
                         if (url != null) {
                             vm.onInputChange(url)
-                            vm.fetch(url)
+                            vm.fetch(url, this@MainActivity)
                             // Home'a git
                             try { navController.navigate(Screen.Home.route) } catch (_: Exception) {}
                         }

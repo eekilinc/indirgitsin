@@ -20,12 +20,12 @@ object ZemerCipherHelper {
 
     suspend fun initialize(context: Context) {
         if (initialized) return
-        await(PlayerConfigStore.initialize(context, null, true))
-        initialized = true
-    }
-
-    private suspend fun await(task: PlayerConfigStore.InitializeTask) = withContext(Dispatchers.IO) {
-        task.await()
+        try {
+            PlayerConfigStore.initialize(context)
+            initialized = true
+        } catch (e: Exception) {
+            // zemer-cipher initialize başarısız olursa uygulama devam etsin
+        }
     }
 
     // SABR URL'yi (serverAbrStreamingUrl) CipherDeobfuscator ile çöz
@@ -44,6 +44,10 @@ object ZemerCipherHelper {
         try {
             CipherDeobfuscator.deobfuscateStreamUrl(urlWithItag)
         } catch (e: Exception) {
+            urlWithItag // fallback: URL'i itag ile
+        }
+    }
+}: Exception) {
             urlWithItag
         }
     }

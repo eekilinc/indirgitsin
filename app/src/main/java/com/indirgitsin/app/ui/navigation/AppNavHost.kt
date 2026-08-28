@@ -36,13 +36,13 @@ fun AppNavHost(
                 inputUrl = inputUrl,
                 onInputChange = homeViewModel::onInputChange,
                 uiState = uiState,
-                onFetch = { url -> homeViewModel.fetch(url) },
+                onFetch = { url -> homeViewModel.fetch(url, androidx.compose.ui.platform.LocalContext.current) },
                 onDownload = onDownload,
                 onPaste = { /* handled in MainActivity */ },
                 historyDao = historyDao,
                 onHistoryClick = { url ->
                     homeViewModel.onInputChange(url)
-                    homeViewModel.fetch(url)
+                    homeViewModel.fetch(url, androidx.compose.ui.platform.LocalContext.current)
                 }
             )
         }
@@ -53,7 +53,7 @@ fun AppNavHost(
                     val url = entity.url
                     navController.navigate(Screen.Home.route)
                     homeViewModel.onInputChange(url)
-                    homeViewModel.fetch(url)
+                    homeViewModel.fetch(url, androidx.compose.ui.platform.LocalContext.current)
                 }
             )
         }

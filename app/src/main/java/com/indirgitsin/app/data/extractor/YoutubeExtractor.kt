@@ -254,7 +254,9 @@ object YoutubeExtractor {
                     // Not: tryInnertube zaten Dispatchers.IO'da çalışıyor, deobfuscate de IO yapar
                     if (isSabr) {
                         try {
-                            url = ZemerCipherHelper.deobfuscateSabrUrlWithItag(serverAbr, itag)
+                            url = withContext(Dispatchers.IO) {
+                                ZemerCipherHelper.deobfuscateSabrUrlWithItag(serverAbr, itag)
+                            }
                         } catch (_: Exception) {
                             // fallback: orijinal URL
                         }
@@ -670,7 +672,7 @@ object YoutubeExtractor {
         return null
     }
 
-    private fun tryWatchPage(videoId: String): VideoInfo? {
+    private suspend fun tryWatchPage(videoId: String): VideoInfo? {
         return try {
             val req = Request.Builder()
                 .url("https://www.youtube.com/watch?v=$videoId&bpctr=9999999999&has_verified=1")
@@ -757,7 +759,6 @@ object YoutubeExtractor {
                         url = serverAbr + "&itag=" + itag
                     }
                     if (url.isBlank()) continue
-                    // SABR URL'leri zemer-cipher ile deobfuscate et
                     if (isSabr) {
                         try {
                             url = ZemerCipherHelper.deobfuscateSabrUrlWithItag(serverAbr, itag)
