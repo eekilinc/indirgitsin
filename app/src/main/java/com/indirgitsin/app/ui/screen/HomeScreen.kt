@@ -33,6 +33,7 @@ import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.UiState
 import com.indirgitsin.app.data.model.VideoInfo
 import com.indirgitsin.app.util.YoutubeLinkHelper
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -356,6 +357,7 @@ private fun RowScope.HowItWorksStep(number: String, title: String, desc: String,
 @Composable
 private fun RecentSection(historyDao: HistoryDao?, onHistoryClick: (String) -> Unit) {
     var recent by remember { mutableStateOf<List<com.indirgitsin.app.data.history.HistoryEntity>>(emptyList()) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(historyDao) {
         historyDao?.observeHistory()?.collect { recent = it.take(5) }
     }
@@ -364,8 +366,7 @@ private fun RecentSection(historyDao: HistoryDao?, onHistoryClick: (String) -> U
             Text("Son denediklerin", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             if (recent.isNotEmpty() && historyDao != null) {
-                val scope = rememberCoroutineScope()
-                TextButton(onClick = { scope.launch(kotlinx.coroutines.Dispatchers.IO) { historyDao.clearAll() } }) { Text("Temizle", style = MaterialTheme.typography.labelSmall) }
+                TextButton(onClick = { scope.launch { historyDao.clearAll() } }) { Text("Temizle", style = MaterialTheme.typography.labelSmall) }
             }
         }
         if (recent.isEmpty()) {
