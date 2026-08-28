@@ -61,10 +61,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
 
-    // NewPipe Extractor - YouTube bilgisi çekme
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.22.10")
-
-    // Networking & Download
+    // Networking & Download (NewPipe yerine Piped + oEmbed - JitPack'e bağımlı değil)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 

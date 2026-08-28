@@ -5,18 +5,25 @@ import com.indirgitsin.app.data.model.VideoInfo
 import com.indirgitsin.app.util.YoutubeLinkHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.schabi.newpipe.extractor.NewPipe
-import org.schabi.newpipe.extractor.ServiceList
-import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeStreamLinkHandlerFactory
-import org.schabi.newpipe.extractor.stream.StreamInfo
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 object YoutubeExtractor {
 
-    init {
-        try {
-            NewPipe.init(DownloaderImpl.getInstance(), null)
-        } catch (_: Exception) {}
-    }
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+
+    // Piped instance'ları - biri down olursa diğerini dener
+    private val pipedInstances = listOf(
+        "https://pipedapi.kavin.rocks",
+        "https://pipedapi.adminforge.de",
+        "https://piped-api.garudalinux.org",
+        "https://api.piped.projectsegfau.lt"
+    )
 
     suspend fun extract(url: String): Result<VideoInfo> = withContext(Dispatchers.IO) {
         try {
@@ -24,79 +31,156 @@ object YoutubeExtractor {
             val videoId = YoutubeLinkHelper.extractVideoId(normalized)
                 ?: return@withContext Result.failure(Exception("Geçersiz YouTube linki"))
 
-            val service = ServiceList.YouTube
-            val linkHandler = YoutubeStreamLinkHandlerFactory.getInstance().fromUrl(normalized)
-            val extractor = service.getStreamExtractor(linkHandler)
-            extractor.fetchPage()
-
-            val title = extractor.name ?: "Bilinmeyen Başlık"
-            val author = extractor.uploaderName ?: "Bilinmeyen Kanal"
-            val thumb = extractor.thumbnails.maxByOrNull { it.height * it.width }?.url ?: ""
-            val duration = extractor.length
-            val viewCount = extractor.viewCount
-
-            val streams = mutableListOf<StreamOption>()
-
-            // Video + Audio muxed
-            extractor.videoStreams?.forEach { vs ->
-                streams.add(
-                    StreamOption(
-                        label = "${vs.resolution} • ${vs.getFormat()?.name ?: "MP4"}",
-                        extension = vs.getFormat()?.suffix ?: "mp4",
-                        quality = vs.resolution ?: "",
-                        url = vs.content ?: "",
-                        isVideo = true,
-                        isAudioOnly = false
-                    )
-                )
+            // 1) Piped API dene (en güvenilir, cipher çözmeden stream URL verir)
+            var pipedResult = tryPiped(videoId)
+            if (pipedResult != null) {
+                return@withContext Result.success(pipedResult)
             }
-            // Audio only
-            extractor.audioStreams?.forEach { a ->
-                val br = a.averageBitrate
-                streams.add(
-                    StreamOption(
-                        label = "Ses • ${a.getFormat()?.name ?: "M4A"} ${if (br>0) "${br}kbps" else ""}",
-                        extension = a.getFormat()?.suffix ?: "m4a",
-                        quality = "${br}kbps",
-                        url = a.content ?: "",
-                        isVideo = false,
-                        isAudioOnly = true,
-                        bitrate = br
-                    )
+
+            // 2) oEmbed fallback (başlık + thumbnail için) - stream olmadan
+            val oembed = tryOEmbed(videoId)
+            if (oembed != null) {
+                // oEmbed'de stream yok, ama kullanıcıya bilgi göster + hata mesajı yerine boş stream ile dön
+                // piped down ise kullanıcıya açık mesaj ver
+                return@withContext Result.failure(
+                    Exception("Şu an Piped sunucularına ulaşılamıyor. Biraz sonra tekrar dene.\nVideo: ${oembed.title}")
                 )
             }
 
-            // Fallback: eğer extractor boşsa StreamInfo kullan
-            if (streams.isEmpty()) {
-                try {
-                    val info = StreamInfo.getInfo(service, linkHandler)
-                    info.videoStreams.forEach { vs ->
-                        streams.add(StreamOption("${vs.resolution}", vs.getFormat()?.suffix ?: "mp4", vs.resolution ?: "", vs.content ?: "", true, false))
-                    }
-                    info.audioStreams.forEach { a ->
-                        streams.add(StreamOption("Ses ${a.averageBitrate}kbps", a.getFormat()?.suffix ?: "m4a", "${a.averageBitrate}", a.content ?: "", false, true, bitrate = a.averageBitrate))
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // MP3 seçeneği için en iyi audio'yu mp3 gibi göster (dönüşüm sunucuda değil, cihazda m4a olarak iner)
-            if (streams.none { it.isAudioOnly }) {
-                // nothing
-            }
-
-            val video = VideoInfo(
-                id = videoId,
-                title = title,
-                author = author,
-                thumbnailUrl = thumb,
-                durationSeconds = duration,
-                viewCount = viewCount,
-                url = normalized,
-                streams = streams.distinctBy { it.url }.sortedWith(compareBy({ !it.isVideo }, { -it.bitrate }))
-            )
-            Result.success(video)
+            Result.failure(Exception("Video bilgileri alınamadı. İnternet bağlantını kontrol et veya farklı bir video dene."))
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private fun tryPiped(videoId: String): VideoInfo? {
+        for (base in pipedInstances) {
+            try {
+                val req = Request.Builder()
+                    .url("$base/streams/$videoId")
+                    .header("User-Agent", "Mozilla/5.0")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) continue
+                    val body = resp.body?.string() ?: continue
+                    val json = JSONObject(body)
+                    if (json.has("error")) continue
+
+                    val title = json.optString("title", "Bilinmeyen Başlık")
+                    val author = json.optString("uploader", json.optString("uploaderName", "Bilinmeyen Kanal"))
+                    val thumb = json.optString("thumbnailUrl", json.optJSONArray("thumbnails")?.optJSONObject(0)?.optString("url") ?: "")
+                    val duration = json.optLong("duration", 0L)
+                    val views = json.optLong("views", 0L)
+
+                    val streams = mutableListOf<StreamOption>()
+
+                    // videoStreams
+                    val vArr = json.optJSONArray("videoStreams")
+                    if (vArr != null) {
+                        for (i in 0 until vArr.length()) {
+                            val o = vArr.getJSONObject(i)
+                            val url = o.optString("url", "")
+                            if (url.isBlank()) continue
+                            val quality = o.optString("quality", "")
+                            val mime = o.optString("mimeType", "video/mp4")
+                            val ext = when {
+                                mime.contains("webm") -> "webm"
+                                mime.contains("mp4") -> "mp4"
+                                else -> "mp4"
+                            }
+                            streams.add(
+                                StreamOption(
+                                    label = "$quality • ${ext.uppercase()}",
+                                    extension = ext,
+                                    quality = quality,
+                                    url = url,
+                                    isVideo = true,
+                                    isAudioOnly = false
+                                )
+                            )
+                        }
+                    }
+
+                    // audioStreams
+                    val aArr = json.optJSONArray("audioStreams")
+                    if (aArr != null) {
+                        for (i in 0 until aArr.length()) {
+                            val o = aArr.getJSONObject(i)
+                            val url = o.optString("url", "")
+                            if (url.isBlank()) continue
+                            val mime = o.optString("mimeType", "audio/mp4")
+                            val ext = when {
+                                mime.contains("webm") -> "webm"
+                                mime.contains("mp4") || mime.contains("m4a") -> "m4a"
+                                mime.contains("mp3") -> "mp3"
+                                else -> "m4a"
+                            }
+                            val bitrate = o.optInt("bitrate", 0)
+                            val quality = if (bitrate > 0) "${bitrate}kbps" else o.optString("quality", "")
+                            streams.add(
+                                StreamOption(
+                                    label = "Ses • ${ext.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(),
+                                    extension = ext,
+                                    quality = quality,
+                                    url = url,
+                                    isVideo = false,
+                                    isAudioOnly = true,
+                                    bitrate = bitrate
+                                )
+                            )
+                        }
+                    }
+
+                    // hls fallback
+                    val hls = json.optString("hls", "")
+                    if (streams.isEmpty() && hls.isNotBlank()) {
+                        streams.add(StreamOption("HLS • M3U8", "m3u8", "auto", hls, true, false))
+                    }
+
+                    if (streams.isEmpty()) continue
+
+                    // Sırala: video önce, sonra ses bitrate'e göre
+                    val sorted = streams.distinctBy { it.url }.sortedWith(
+                        compareBy<StreamOption> { !it.isVideo }.thenByDescending { it.bitrate }
+                    )
+
+                    return VideoInfo(
+                        id = videoId,
+                        title = title,
+                        author = author,
+                        thumbnailUrl = thumb,
+                        durationSeconds = duration,
+                        viewCount = views,
+                        url = "https://www.youtube.com/watch?v=$videoId",
+                        streams = sorted
+                    )
+                }
+            } catch (_: Exception) {
+                continue
+            }
+        }
+        return null
+    }
+
+    private fun tryOEmbed(videoId: String): VideoInfo? {
+        return try {
+            val url = "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=$videoId&format=json"
+            val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                val json = JSONObject(body)
+                VideoInfo(
+                    id = videoId,
+                    title = json.optString("title", "Bilinmeyen Başlık"),
+                    author = json.optString("author_name", "Bilinmeyen Kanal"),
+                    thumbnailUrl = json.optString("thumbnail_url", "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"),
+                    durationSeconds = 0,
+                    viewCount = 0,
+                    url = "https://www.youtube.com/watch?v=$videoId",
+                    streams = emptyList()
+                )
+            }
+        } catch (_: Exception) { null }
     }
 }
