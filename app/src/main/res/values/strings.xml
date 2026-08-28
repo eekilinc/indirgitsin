@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">İndir Gitsin</string>
+    <string name="paste_hint">YouTube linkini yapıştır</string>
+    <string name="paste">Yapıştır</string>
+    <string name="fetch">Getir</string>
+    <string name="downloading">İndiriliyor…</string>
+    <string name="download">İndir</string>
+    <string name="choose_quality">İndirme Seçenekleri</string>
+    <string name="clipboard_found">Panoda YouTube linki bulundu</string>
+    <string name="no_link">Geçerli bir YouTube linki gir</string>
+</resources>

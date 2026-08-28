@@ -1,0 +1,30 @@
+package com.indirgitsin.app.data.model
+
+data class VideoInfo(
+    val id: String,
+    val title: String,
+    val author: String,
+    val thumbnailUrl: String,
+    val durationSeconds: Long,
+    val viewCount: Long,
+    val url: String,
+    val streams: List<StreamOption> = emptyList()
+)
+
+data class StreamOption(
+    val label: String, // örn: "1080p MP4", "720p", "MP3 128kbps"
+    val extension: String, // mp4, mp3, m4a, webm
+    val quality: String,
+    val url: String,
+    val isVideo: Boolean,
+    val isAudioOnly: Boolean,
+    val sizeApprox: String = "",
+    val bitrate: Int = 0
+)
+
+sealed class UiState {
+    object Idle : UiState()
+    object Loading : UiState()
+    data class Success(val video: VideoInfo) : UiState()
+    data class Error(val message: String) : UiState()
+}
