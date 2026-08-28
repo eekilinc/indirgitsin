@@ -33,7 +33,7 @@ class HomeViewModel : ViewModel() {
 
     fun clearClipboardSuggestion() { _clipboardSuggestion.value = null }
 
-    fun fetch(url: String) {
+    fun fetch(url: String, context: android.content.Context) {
         val normalized = YoutubeLinkHelper.findYoutubeUrlInText(url) ?: url
         if (!YoutubeLinkHelper.isValidYoutubeUrl(normalized)) {
             _uiState.value = UiState.Error("Geçerli bir YouTube / YouTube Music linki gir. Örn: https://youtu.be/...")
@@ -41,7 +41,7 @@ class HomeViewModel : ViewModel() {
         }
         _uiState.value = UiState.Loading
         viewModelScope.launch {
-            val result = YoutubeExtractor.extract(normalized)
+            val result = YoutubeExtractor.extract(normalized, context)
             result.onSuccess { video ->
                 if (video.streams.isEmpty()) {
                     _uiState.value = UiState.Error("Video bulundu ama indirilebilir akış bulunamadı. Farklı bir video dene.")

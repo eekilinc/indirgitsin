@@ -37,8 +37,11 @@ object YoutubeExtractor {
     private const val CACHE_TTL_MS = 10 * 60 * 1000L
     private const val INNERTUBE_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
 
-    suspend fun extract(url: String): Result<VideoInfo> = withContext(Dispatchers.IO) {
+    suspend fun extract(url: String, context: android.content.Context): Result<VideoInfo> = withContext(Dispatchers.IO) {
         try {
+            // zemer-cipher initialize (PlayerConfigStore) - SABR URL çözümlemesi için
+            ZemerCipherHelper.initialize(context)
+            
             val normalized = YoutubeLinkHelper.normalizeUrl(url)
             val videoId = YoutubeLinkHelper.extractVideoId(normalized)
                 ?: return@withContext Result.failure(Exception("Geçersiz YouTube linki"))
@@ -224,6 +227,7 @@ object YoutubeExtractor {
 
             // Adaptive - video only ve audio only
             // SABR videolarinda adaptiveFormats metadata-only: url/cipher yok, itag + initRange/indexRange var
+            // zemer-cipher ile serverAbrStreamingUrl + itag çözülür
             val adaptive = streamingData.optJSONArray("adaptiveFormats")
             if (adaptive != null) {
                 for (i in 0 until adaptive.length()) {
@@ -240,12 +244,21 @@ object YoutubeExtractor {
                     val quality = f.optString("qualityLabel", "")
                     val itag = f.optString("itag", "")
                     val bitrate = f.optInt("bitrate", 0) / 1000
-                    // SABR: url yok ama itag var -> serverAbr + itag ile URL yap
+                    // SABR: url yok ama itag var -> serverAbr + itag ile URL yap, sonra zemer-cipher ile çöz
                     val isSabr = url.isBlank() && itag.isNotBlank() && serverAbr.isNotBlank()
                     if (isSabr) {
                         url = serverAbr + "&itag=" + itag
                     }
                     if (url.isBlank()) continue
+                    // SABR URL'leri zemer-cipher ile deobfuscate et (async, ama burada sync çalışıyor)
+                    // Not: tryInnertube zaten Dispatchers.IO'da çalışıyor, deobfuscate de IO yapar
+                    if (isSabr) {
+                        try {
+                            url = ZemerCipherHelper.deobfuscateSabrUrlWithItag(serverAbr, itag)
+                        } catch (_: Exception) {
+                            // fallback: orijinal URL
+                        }
+                    }
                     if (mime.contains("video")) {
                         if (quality.isBlank()) continue
                         val ext = if (mime.contains("webm")) "webm" else "mp4"
@@ -744,6 +757,14 @@ object YoutubeExtractor {
                         url = serverAbr + "&itag=" + itag
                     }
                     if (url.isBlank()) continue
+                    // SABR URL'leri zemer-cipher ile deobfuscate et
+                    if (isSabr) {
+                        try {
+                            url = ZemerCipherHelper.deobfuscateSabrUrlWithItag(serverAbr, itag)
+                        } catch (_: Exception) {
+                            // fallback: orijinal URL
+                        }
+                    }
                     if (mime.contains("video")) {
                         val quality = f.optString("qualityLabel", "")
                         if (quality.isBlank()) continue
