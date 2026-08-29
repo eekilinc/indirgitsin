@@ -85,9 +85,6 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            // Premium hero - Spotify/YouTube tarzı
-            item { YtPremiumHero() }
-
             // Search bar - YouTube search style
             item {
                 YtSearchBar(

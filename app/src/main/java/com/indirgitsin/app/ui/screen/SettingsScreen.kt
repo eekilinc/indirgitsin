@@ -5,7 +5,9 @@ import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -34,7 +36,7 @@ fun SettingsScreen() {
     var manualUpdate by remember { mutableStateOf<com.indirgitsin.app.util.UpdateChecker.UpdateInfo?>(null) }
     val theme by SettingsStore.themeFlow(context).collectAsState(initial = "dark")
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Ayarlar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
         Text("Premium deneyim • YouTube & Spotify tarzı", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
@@ -195,21 +197,22 @@ fun SettingsScreen() {
                     "İndir Gitsin — YouTube ve YouTube Music linklerinden video ve sesleri cihazına hızlıca indir. Gizlilik odaklı, reklamsız, tek dokunuşla. İndirilenler cihazında kalır, iz bırakmaz.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = {
+                Button(
+                    onClick = {
                         try {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eekilinc/indirgitsin"))
                             context.startActivity(intent)
                         } catch (_: Exception) {
                             Toast.makeText(context, "github.com/eekilinc/indirgitsin", Toast.LENGTH_SHORT).show()
                         }
-                    }, label = { Text("GitHub") }, leadingIcon = { Icon(Icons.Rounded.Code, null, modifier = Modifier.size(16.dp)) })
-                    TextButton(onClick = {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eekilinc/indirgitsin"))
-                            context.startActivity(intent)
-                        } catch (_: Exception) {}
-                    }) { Text("github.com/eekilinc/indirgitsin", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF24292F), contentColor = Color.White)
+                ) {
+                    Icon(Icons.Rounded.OpenInNew, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("github.com/eekilinc/indirgitsin", fontWeight = FontWeight.Bold)
                 }
             }
         }
