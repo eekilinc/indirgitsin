@@ -18,6 +18,7 @@ import com.indirgitsin.app.ui.screen.SettingsScreen
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object History : Screen("history")
+    object Downloads : Screen("downloads")
     object Settings : Screen("settings")
 }
 
@@ -60,6 +61,9 @@ fun AppNavHost(
                     homeViewModel.fetch(url, context)
                 }
             )
+        }
+        composable(Screen.Downloads.route) {
+            com.indirgitsin.app.ui.screen.DownloadsScreen()
         }
         composable(Screen.Settings.route) {
             SettingsScreen()

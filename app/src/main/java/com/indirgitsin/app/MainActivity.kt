@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
     private val bottomItems = listOf(
         BottomItem(Screen.Home.route, "Ana Sayfa", Icons.Rounded.Home, Icons.Rounded.Home),
         BottomItem(Screen.History.route, "Kitaplık", Icons.Rounded.VideoLibrary, Icons.Rounded.VideoLibrary),
+        BottomItem(Screen.Downloads.route, "İndirilenler", Icons.Rounded.Download, Icons.Rounded.DownloadDone),
         BottomItem(Screen.Settings.route, "Sen", Icons.Rounded.AccountCircle, Icons.Rounded.AccountCircle)
     )
 
