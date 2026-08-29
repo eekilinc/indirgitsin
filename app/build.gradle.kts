@@ -5,6 +5,12 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Versiyon GitHub ile otomatik senkron: tag v1.0.X ise X, yoksa GITHUB_RUN_NUMBER, yoksa 1
+val gitTagVersion = System.getenv("GITHUB_REF_NAME")?.removePrefix("v")?.takeIf { it.matches(Regex("""\d+\.\d+\.\d+.*""")) }
+val runNumberVersion = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val appVersionCode = runNumberVersion ?: 1
+val appVersionName = gitTagVersion ?: "1.0.$appVersionCode"
+
 android {
     namespace = "com.indirgitsin.app"
     compileSdk = 34
@@ -13,8 +19,8 @@ android {
         applicationId = "com.indirgitsin.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
