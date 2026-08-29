@@ -19,16 +19,16 @@ object YoutubeExtractor {
         .build()
 
     private val pipedInstances = listOf(
-        "https://pipedapi.kavin.rocks",
         "https://pipedapi.adminforge.de",
-        "https://piped-api.garudalinux.org",
-        "https://api.piped.projectsegfau.lt"
+        "https://api.piped.projectsegfau.lt",
+        "https://piped-api.lunar.icus.cloud",
+        "https://pipedapi.in.projectsegfau.lt"
     )
 
     private val invidiousInstances = listOf(
+        "https://inv.nadeko.net",
+        "https://invidious.nerdvpn.de",
         "https://vid.puffyan.us",
-        "https://invidious.snopyta.org",
-        "https://y.com.sb",
         "https://inv.n8pjl.ca"
     )
 
@@ -51,35 +51,40 @@ object YoutubeExtractor {
                 }
             }
 
-            // 1) Innertube (4 client)
+            // Radikal: en guvenilir kaynaklar paralel - Cobalt + Piped + Invidious once dene
+            // SABR icin Innertube bos donecegi icin bu 3'u hayati
+            val fastResult = coroutineScope {
+                val cobaltDef = async { withTimeoutOrNull(7000) { tryCobalt(videoId) } }
+                val pipedDef = async { tryPipedParallel(videoId) }
+                val invidiousDef = async { tryInvidiousParallel(videoId) }
+                // en hizli donen kazanir
+                var winner: VideoInfo? = null
+                val jobs = listOf(cobaltDef, pipedDef, invidiousDef)
+                for (d in jobs) {
+                    try {
+                        val r = d.await()
+                        if (r != null && winner == null) winner = r
+                    } catch (_: Exception) {}
+                }
+                // bekleyenleri iptal etme - arka planda kalsin, winner varsa don
+                if (winner != null) {
+                    jobs.forEach { it.cancel() }
+                    winner
+                } else null
+            }
+            if (fastResult != null) {
+                synchronized(cache) { cache[videoId] = fastResult; cacheTime[videoId] = System.currentTimeMillis() }
+                return@withContext Result.success(fastResult)
+            }
+
+            // 2) Innertube (4 client) - SABR ise null doner, fallback'e dusmez cunku ustte zaten denedik
             val innertube = withTimeoutOrNull(8000) { tryInnertube(videoId) }
             if (innertube != null) {
                 synchronized(cache) { cache[videoId] = innertube; cacheTime[videoId] = System.currentTimeMillis() }
                 return@withContext Result.success(innertube)
             }
 
-            // 2) Piped paralel
-            val pipedResult = tryPipedParallel(videoId)
-            if (pipedResult != null) {
-                synchronized(cache) { cache[videoId] = pipedResult; cacheTime[videoId] = System.currentTimeMillis() }
-                return@withContext Result.success(pipedResult)
-            }
-
-            // 3) Invidious paralel
-            val invidious = tryInvidiousParallel(videoId)
-            if (invidious != null) {
-                synchronized(cache) { cache[videoId] = invidious; cacheTime[videoId] = System.currentTimeMillis() }
-                return@withContext Result.success(invidious)
-            }
-
-            // 4) Cobalt API (en sağlam 3. parti, doğrudan indir linki verir)
-            val cobalt = withTimeoutOrNull(7000) { tryCobalt(videoId) }
-            if (cobalt != null) {
-                synchronized(cache) { cache[videoId] = cobalt; cacheTime[videoId] = System.currentTimeMillis() }
-                return@withContext Result.success(cobalt)
-            }
-
-            // 5) Watch page ytInitialPlayerResponse parse
+            // 3) Watch page ytInitialPlayerResponse parse (son care)
             val watchPage = withTimeoutOrNull(7000) { tryWatchPage(videoId) }
             if (watchPage != null) {
                 synchronized(cache) { cache[videoId] = watchPage; cacheTime[videoId] = System.currentTimeMillis() }
