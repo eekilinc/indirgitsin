@@ -48,10 +48,10 @@ class DownloaderImpl private constructor(private val client: OkHttpClient) : Dow
         val responseHeaders = response.headers.toMultimap().mapValues { it.value.toMutableList() }
         return org.schabi.newpipe.extractor.downloader.Response(
             response.code,
-            body,
+            response.message,
             responseHeaders,
-            latestUrl,
-            null
+            body,
+            latestUrl
         )
     }
 }
