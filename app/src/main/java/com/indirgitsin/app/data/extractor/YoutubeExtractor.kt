@@ -51,24 +51,30 @@ object YoutubeExtractor {
                 }
             }
 
-            // Radikal: en guvenilir kaynaklar paralel - Cobalt + Piped + Invidious once dene
-            // SABR icin Innertube bos donecegi icin bu 3'u hayati
+            // Radikal: NewPipe (en guvenilir - tum 3.parti API'ler kapandi) + Cobalt/Piped/Invidious paralel
             val fastResult = coroutineScope {
+                val newPipeDef = async { withTimeoutOrNull(15000) { NewPipeHelper.extract(videoId) } }
                 val cobaltDef = async { withTimeoutOrNull(7000) { tryCobalt(videoId) } }
                 val pipedDef = async { tryPipedParallel(videoId) }
                 val invidiousDef = async { tryInvidiousParallel(videoId) }
-                // en hizli donen kazanir
+                // race: ilk basarili sonucu bekle, digerlerini iptal et
                 var winner: VideoInfo? = null
-                val jobs = listOf(cobaltDef, pipedDef, invidiousDef)
-                for (d in jobs) {
-                    try {
-                        val r = d.await()
-                        if (r != null && winner == null) winner = r
-                    } catch (_: Exception) {}
+                // NewPipe'i once bekle (en guvenilir)
+                try {
+                    val np = newPipeDef.await()
+                    if (np != null) winner = np
+                } catch (_: Exception) {}
+                if (winner == null) {
+                    val jobs = listOf(cobaltDef, pipedDef, invidiousDef)
+                    for (d in jobs) {
+                        try {
+                            val r = d.await()
+                            if (r != null && winner == null) winner = r
+                        } catch (_: Exception) {}
+                    }
                 }
-                // bekleyenleri iptal etme - arka planda kalsin, winner varsa don
                 if (winner != null) {
-                    jobs.forEach { it.cancel() }
+                    listOf(newPipeDef, cobaltDef, pipedDef, invidiousDef).forEach { try { it.cancel() } catch (_: Exception) {} }
                     winner
                 } else null
             }
