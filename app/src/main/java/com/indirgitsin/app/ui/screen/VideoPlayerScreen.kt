@@ -272,7 +272,7 @@ fun VideoPlayerScreen(
                             ) {
                                 Icon(
                                     if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                    contentDescription = if (isPlaying) "Duraklat" : "Oynat",
+                                    contentDescription = if (isPlaying) "Duraklat" else "Oynat",
                                     tint = Color.White,
                                     modifier = Modifier.size(28.dp)
                                 )
