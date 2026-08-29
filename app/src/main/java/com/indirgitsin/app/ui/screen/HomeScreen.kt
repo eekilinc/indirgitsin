@@ -46,7 +46,8 @@ fun HomeScreen(
     onDownload: (VideoInfo, StreamOption) -> Unit,
     onPaste: () -> Unit,
     historyDao: HistoryDao? = null,
-    onHistoryClick: (String) -> Unit = {}
+    onHistoryClick: (String) -> Unit = {},
+    onClear: () -> Unit = {}
 ) {
     var showSheet by remember { mutableStateOf(false) }
     var selectedVideo by remember { mutableStateOf<VideoInfo?>(null) }
@@ -111,7 +112,17 @@ fun HomeScreen(
                         when (state) {
                             is UiState.Loading -> YtShimmerCard()
                             is UiState.Error -> YtErrorCard(state.message)
-                            is UiState.Success -> YtVideoCard(video = state.video, onClick = { showSheet = true })
+                            is UiState.Success -> Box {
+                                YtVideoCard(video = state.video, onClick = { showSheet = true })
+                                SmallCloseButton(
+                                    onClick = {
+                                        onClear()
+                                        showSheet = false
+                                        selectedVideo = null
+                                    },
+                                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                                )
+                            }
                             else -> YtEmptyState()
                         }
                     }
@@ -601,6 +612,20 @@ private fun YtOptionRow(label: String, sublabel: String, isVideo: Boolean, onCli
                 Spacer(Modifier.width(4.dp))
                 Text("İndir", fontWeight = FontWeight.Bold)
             }
+        }
+    }
+}
+
+@Composable
+private fun SmallCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = Color.Black.copy(alpha = 0.6f),
+        modifier = modifier.size(28.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(Icons.Rounded.Close, contentDescription = "Kaldır", tint = Color.White, modifier = Modifier.size(16.dp))
         }
     }
 }

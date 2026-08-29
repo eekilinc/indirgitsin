@@ -48,6 +48,10 @@ fun AppNavHost(
                 onHistoryClick = { url ->
                     homeViewModel.onInputChange(url)
                     homeViewModel.fetch(url, context)
+                },
+                onClear = {
+                    homeViewModel.reset()
+                    homeViewModel.onInputChange("")
                 }
             )
         }
