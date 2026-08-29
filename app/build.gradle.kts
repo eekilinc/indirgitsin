@@ -66,8 +66,8 @@ dependencies {
     // zemer-cipher: YouTube cipher + PoToken (composite build from cipher/ submodule)
     implementation("com.zemer:cipher")
     implementation("com.jakewharton.timber:timber:5.0.1")
-    // NewPipeExtractor - radikal cozum: tum 3.parti API'ler (Piped/Invidious/Cobalt) kapandi, direkt YouTube parsing
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.25.1")
+    // NewPipeExtractor - v0.26.3+ SABR workaround (PR #1508) iceriyor, eski v0.25.1 SABR'yi cozemiyor
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 
     // DataStore (ayarlar)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
