@@ -53,6 +53,25 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val backStack by navController.currentBackStackEntryAsState()
                 val currentRoute = backStack?.destination?.route
+                var updateInfo by remember { mutableStateOf<com.indirgitsin.app.util.UpdateChecker.UpdateInfo?>(null) }
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(2000)
+                    updateInfo = com.indirgitsin.app.util.UpdateChecker.check(this@MainActivity)
+                }
+                if (updateInfo != null) {
+                    AlertDialog(
+                        onDismissRequest = { updateInfo = null },
+                        title = { Text("Güncelleme var: ${updateInfo!!.latestTag}") },
+                        text = { Text(updateInfo!!.body.take(300).ifBlank { "Yeni sürüm mevcut. Güncellemek ister misin?" }) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                com.indirgitsin.app.util.UpdateChecker.openUpdatePage(this@MainActivity, updateInfo!!)
+                                updateInfo = null
+                            }) { Text("Güncelle") }
+                        },
+                        dismissButton = { TextButton(onClick = { updateInfo = null }) { Text("Sonra") } }
+                    )
+                }
 
                 Scaffold(
                     bottomBar = {

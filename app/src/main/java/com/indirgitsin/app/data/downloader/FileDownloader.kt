@@ -1,20 +1,17 @@
 package com.indirgitsin.app.data.downloader
 
-import android.content.ContentValues
 import android.content.Context
-import android.os.Build
 import android.os.Environment
-import android.provider.MediaStore
 import android.widget.Toast
+import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 object FileDownloader {
@@ -30,108 +27,30 @@ object FileDownloader {
         val qualityPart = option.quality.ifBlank { option.label.replace(" ", "_").take(20) }
         val fileName = "${safeTitle}_${qualityPart}.$ext".replace(Regex("[^a-zA-Z0-9._-]"), "_")
 
-        // Radikal: DownloadManager birincil - OkHttp manuel indirme YouTube throttling (50KB/s) ve timeout'ta yarim kaliyordu
-        try {
-            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
-            val request = android.app.DownloadManager.Request(android.net.Uri.parse(option.url)).apply {
-                setTitle(fileName)
-                setDescription("İndir Gitsin • ${option.label}")
-                setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                setMimeType(if (option.isAudioOnly) "audio/*" else "video/*")
-                setAllowedOverMetered(true)
-                setAllowedOverRoaming(true)
-                addRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                addRequestHeader("Referer", "https://www.youtube.com/")
-                addRequestHeader("Origin", "https://www.youtube.com")
-            }
-            dm.enqueue(request)
-            Toast.makeText(context, "İndiriliyor: $fileName\nBildirimden takip et", Toast.LENGTH_SHORT).show()
-            return
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(context, "DownloadManager hata: ${e.message} - OkHttp deneniyor", Toast.LENGTH_SHORT).show()
-        }
-
-        // Fallback: OkHttp manuel indirme (sadece DownloadManager basarisiz olursa)
-        Toast.makeText(context, "İndiriliyor: $fileName", Toast.LENGTH_SHORT).show()
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.Main).launch {
+            val subfolder = try { withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin" } catch (_: Exception) { "IndirGitsin" }
+            val relative = "${Environment.DIRECTORY_DOWNLOADS}/$subfolder"
+            val destFile = "$subfolder/$fileName"
             try {
-                val request = Request.Builder()
-                    .url(option.url)
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .header("Referer", "https://www.youtube.com/")
-                    .header("Origin", "https://www.youtube.com")
-                    .header("Accept", "*/*")
-                    .header("Accept-Language", "en-US,en;q=0.9")
-                    .header("Connection", "keep-alive")
-                    .build()
-
-                val response = client.newCall(request).execute()
-                if (!response.isSuccessful) throw Exception("Sunucu hatası: ${response.code} - ${response.message}")
-
-                val body = response.body ?: throw Exception("Boş yanıt")
-                val input = body.byteStream()
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                        put(MediaStore.MediaColumns.MIME_TYPE, if (option.isAudioOnly) "audio/mp4" else "video/mp4")
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                        put(MediaStore.MediaColumns.IS_PENDING, 1)
-                    }
-                    val resolver = context.contentResolver
-                    val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                        ?: throw Exception("Dosya oluşturulamadı")
-
-                    resolver.openOutputStream(uri)?.use { out ->
-                        input.copyTo(out)
-                    }
-                    input.close()
-
-                    values.clear()
-                    values.put(MediaStore.MediaColumns.IS_PENDING, 0)
-                    resolver.update(uri, values, null, null)
-
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "İndirildi: $fileName\nİndirilenler klasöründe", Toast.LENGTH_LONG).show()
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    if (!dir.exists()) dir.mkdirs()
-                    val file = File(dir, fileName)
-                    file.outputStream().use { out ->
-                        input.copyTo(out)
-                    }
-                    input.close()
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "İndirildi: ${file.absolutePath}", Toast.LENGTH_LONG).show()
-                    }
+                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                val request = android.app.DownloadManager.Request(android.net.Uri.parse(option.url)).apply {
+                    setTitle(fileName)
+                    setDescription("İndir Gitsin • ${option.label}")
+                    setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, destFile)
+                    setMimeType(if (option.isAudioOnly) "audio/*" else "video/*")
+                    setAllowedOverMetered(true)
+                    setAllowedOverRoaming(true)
+                    addRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    addRequestHeader("Referer", "https://www.youtube.com/")
+                    addRequestHeader("Origin", "https://www.youtube.com")
                 }
-                body.close()
+                dm.enqueue(request)
+                Toast.makeText(context, "İndiriliyor: $fileName\n$relative • Bildirimden takip et", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 e.printStackTrace()
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "İndirme hatası: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                Toast.makeText(context, "İndirme hatası: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
-    }
-
-    private fun fallbackDownloadManager(context: Context, url: String, fileName: String, option: StreamOption) {
-        try {
-            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
-            val request = android.app.DownloadManager.Request(android.net.Uri.parse(url)).apply {
-                setTitle(fileName)
-                setDescription("İndir Gitsin • ${option.label}")
-                setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                setMimeType(if (option.isAudioOnly) "audio/*" else "video/*")
-                addRequestHeader("User-Agent", "Mozilla/5.0")
-                addRequestHeader("Referer", "https://www.youtube.com/")
-            }
-            dm.enqueue(request)
-        } catch (_: Exception) {}
     }
 }

@@ -26,6 +26,12 @@ fun SettingsScreen() {
     val scope = rememberCoroutineScope()
     val autoHigh by SettingsStore.autoHighFlow(context).collectAsState(initial = true)
     val audioFormat by SettingsStore.audioFormatFlow(context).collectAsState(initial = "M4A")
+    val downloadFolder by SettingsStore.downloadSubfolderFlow(context).collectAsState(initial = "IndirGitsin")
+    var showFolderDialog by remember { mutableStateOf(false) }
+    var folderInput by remember { mutableStateOf("") }
+    val version = remember { try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0" } catch (_: Exception) { "1.0.0" } }
+    var checking by remember { mutableStateOf(false) }
+    var manualUpdate by remember { mutableStateOf<com.indirgitsin.app.util.UpdateChecker.UpdateInfo?>(null) }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Ayarlar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
@@ -34,23 +40,65 @@ fun SettingsScreen() {
         PremiumSettingCard(
             icon = Icons.Rounded.Folder,
             title = "İndirme Konumu",
-            subtitle = "İndirilenler klasörü • /Download",
+            subtitle = "İndirilenler • /Download/$downloadFolder",
             action = {
-                TextButton(onClick = {
-                    try {
-                        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                        val uri = Uri.parse(dir.absolutePath)
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, "resource/folder")
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = {
+                        try {
+                            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS + "/$downloadFolder")
+                            if (!dir.exists()) dir.mkdirs()
+                            val uri = Uri.parse(dir.absolutePath)
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "resource/folder")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Klasörü aç"))
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "/Download/$downloadFolder", Toast.LENGTH_SHORT).show()
                         }
-                        context.startActivity(Intent.createChooser(intent, "Klasörü aç"))
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "/Download klasörü", Toast.LENGTH_SHORT).show()
-                    }
-                }) { Text("Aç", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
+                    }) { Text("Aç", fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = { folderInput = downloadFolder; showFolderDialog = true }) { Text("Değiştir", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
+                }
             }
         )
+        if (showFolderDialog) {
+            AlertDialog(
+                onDismissRequest = { showFolderDialog = false },
+                title = { Text("Klasör Seç") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("İndirilenler altında oluşturulacak klasör adı:", style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(value = folderInput, onValueChange = { folderInput = it }, singleLine = true, placeholder = { Text("IndirGitsin") })
+                        Text("Örn: IndirGitsin, Muzikler, Videolar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        scope.launch {
+                            val clean = folderInput.take(30).replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "IndirGitsin" }
+                            SettingsStore.setDownloadSubfolder(context, clean)
+                            Toast.makeText(context, "Klasör: /Download/$clean", Toast.LENGTH_SHORT).show()
+                        }
+                        showFolderDialog = false
+                    }) { Text("Kaydet") }
+                },
+                dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text("İptal") } }
+            )
+        }
+        if (manualUpdate != null) {
+            AlertDialog(
+                onDismissRequest = { manualUpdate = null },
+                title = { Text("Güncelleme var: ${manualUpdate!!.latestTag}") },
+                text = { Text(manualUpdate!!.body.take(350).ifBlank { "Yeni sürüm mevcut." }) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        com.indirgitsin.app.util.UpdateChecker.openUpdatePage(context, manualUpdate!!)
+                        manualUpdate = null
+                    }) { Text("Güncelle") }
+                },
+                dismissButton = { TextButton(onClick = { manualUpdate = null }) { Text("Kapat") } }
+            )
+        }
         PremiumSettingCard(
             icon = Icons.Rounded.HighQuality,
             title = "Varsayılan Kalite",
@@ -95,8 +143,50 @@ fun SettingsScreen() {
                 }) { Text("Temizle", fontWeight = FontWeight.Bold) }
             }
         )
+        PremiumSettingCard(
+            icon = Icons.Rounded.SystemUpdate,
+            title = "Güncelleme",
+            subtitle = "v$version • GitHub'dan denetle",
+            action = {
+                if (checking) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                else TextButton(onClick = {
+                    checking = true
+                    scope.launch {
+                        val info = com.indirgitsin.app.util.UpdateChecker.check(context)
+                        checking = false
+                        if (info != null) manualUpdate = info else Toast.makeText(context, "En güncel sürümdesin • v$version", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("Denetle", fontWeight = FontWeight.Bold) }
+            }
+        )
 
-        // Hakkinda - GitHub vs
+        // Hakkinda - Program hakkinda + versiyon + github
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Info, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Program Hakkında", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.weight(1f))
+                    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary) { Text(" v$version ", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), color = Color.White, style = MaterialTheme.typography.labelSmall) }
+                }
+                Text(
+                    "İndir Gitsin — YouTube ve YouTube Music linklerinden video ve sesleri cihazına hızlıca indir. Gizlilik odaklı, reklamsız, tek dokunuşla. İndirilenler cihazında kalır, iz bırakmaz.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip(onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eekilinc/indirgitsin"))
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            Toast.makeText(context, "github.com/eekilinc/indirgitsin", Toast.LENGTH_SHORT).show()
+                        }
+                    }, label = { Text("GitHub") }, leadingIcon = { Icon(Icons.Rounded.Code, null, modifier = Modifier.size(16.dp)) })
+                    Text("github.com/eekilinc/indirgitsin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
         Card(
             onClick = {
                 try {
@@ -118,8 +208,8 @@ fun SettingsScreen() {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Hakkında", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                    Text("github.com/eekilinc/indirgitsin • Açık kaynak • v1.0.0", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Kaynak Kod", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text("github.com/eekilinc/indirgitsin • Açık kaynak", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(Icons.Rounded.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -145,7 +235,7 @@ fun SettingsScreen() {
                 Icon(Icons.Rounded.Info, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("İndir Gitsin v1.0.0", fontWeight = FontWeight.Bold)
+                    Text("İndir Gitsin v$version", fontWeight = FontWeight.Bold)
                     Text("Sadece izinli içerikler için kullanın. YouTube ToS'a uyun.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

@@ -180,8 +180,10 @@ private fun YtTopBar() {
                 }
             }
             Spacer(Modifier.weight(1f))
-            Box(Modifier.size(28.dp).clip(CircleShape).background(Color(0xFF8E44AD)).clickable { android.widget.Toast.makeText(context, "Sen sekmesine geç", android.widget.Toast.LENGTH_SHORT).show() }, contentAlignment = Alignment.Center) {
-                Text("E", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(32.dp).clickable { android.widget.Toast.makeText(context, "Ayarlar yakında", android.widget.Toast.LENGTH_SHORT).show() }) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Rounded.Settings, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                }
             }
         }
     }
