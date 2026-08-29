@@ -565,8 +565,8 @@ private fun YtDownloadSheet(
                     Text(video.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                     Text(video.author, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                val context = LocalContext.current
                 IconButton(onClick = {
-                    val context = androidx.compose.ui.platform.LocalContext.current
                     val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(video.url))
                     context.startActivity(intent)
                 }) {
