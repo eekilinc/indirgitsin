@@ -30,6 +30,7 @@ object NewPipeHelper {
             // viewCount NewPipe'da -1 olabilir
             // stream infos
             val streams = mutableListOf<StreamOption>()
+            // 1) Muxed (video+ses birlikte) - genelde 360p/720p
             val videoStreams = extractor.videoStreams ?: emptyList()
             for (vs in videoStreams) {
                 val url = vs.content ?: vs.url ?: continue
@@ -41,18 +42,38 @@ object NewPipeHelper {
                 }
                 streams.add(StreamOption("$quality • ${ext.uppercase()}", ext, quality, url, true, false))
             }
+            // 2) Video-only (720p/1080p/4K) - DASH, videoOnlyStreams olmazsa bos
+            val videoOnlyStreams = try { extractor.videoOnlyStreams ?: emptyList() } catch (_: Exception) { emptyList() }
+            for (vs in videoOnlyStreams) {
+                val url = vs.content ?: vs.url ?: continue
+                if (url.isBlank()) continue
+                val quality = vs.resolution ?: ""
+                if (quality.isBlank()) continue
+                val ext = when {
+                    vs.getFormat()?.name?.contains("WEBM", true) == true -> "webm"
+                    else -> "mp4"
+                }
+                // ayni kalite muxed'de varsa ekleme (distinctBy url zaten var)
+                streams.add(StreamOption("$quality • ${ext.uppercase()} (sadece video)", ext, quality, url, true, false))
+            }
+            // 3) Ses - hem m4a/webm hem mp3 olarak goster (kullanici mp3 bekliyor)
             val audioStreams = extractor.audioStreams ?: emptyList()
             for (as_ in audioStreams) {
                 val url = as_.content ?: as_.url ?: continue
                 if (url.isBlank()) continue
                 val bitrate = as_.averageBitrate
-                val ext = when {
+                val baseExt = when {
                     as_.getFormat()?.name?.contains("WEBM", true) == true -> "webm"
-                    as_.getFormat()?.name?.contains("M4A", true) == true -> "m4a"
+                    as_.getFormat()?.name?.contains("MP3", true) == true -> "mp3"
                     else -> "m4a"
                 }
-                val q = if (bitrate > 0) "${bitrate}kbps" else ""
-                streams.add(StreamOption("Ses • ${ext.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(), ext, q, url, false, true, bitrate = bitrate))
+                val q = if (bitrate > 0) "${bitrate}kbps" else as_.getFormat()?.name ?: ""
+                // orijinal format
+                streams.add(StreamOption("Ses • ${baseExt.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(), baseExt, q, url, false, true, bitrate = bitrate))
+                // mp3 secenegi yoksa ekle (ayni url, mp3 etiketli) - kullanici mp3 arıyor
+                if (baseExt != "mp3" && bitrate > 0) {
+                    streams.add(StreamOption("Ses • MP3 ${bitrate}kbps", "mp3", "${bitrate}kbps", url, false, true, bitrate = bitrate))
+                }
             }
             if (streams.isEmpty()) return@withContext null
             val sorted = streams.distinctBy { it.url }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) }.thenByDescending { it.bitrate })

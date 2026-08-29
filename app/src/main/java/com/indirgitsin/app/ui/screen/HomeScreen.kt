@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -156,6 +157,7 @@ fun HomeScreen(
 
 @Composable
 private fun YtTopBar() {
+    val context = LocalContext.current
     Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -178,10 +180,10 @@ private fun YtTopBar() {
                 }
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = {}) { Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.onBackground) }
-            IconButton(onClick = {}) { Icon(Icons.Rounded.Notifications, null, tint = MaterialTheme.colorScheme.onBackground) }
+            IconButton(onClick = { android.widget.Toast.makeText(context, "Arama: yukarıdaki çubuğa link yapıştır", android.widget.Toast.LENGTH_SHORT).show() }) { Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.onBackground) }
+            IconButton(onClick = { android.widget.Toast.makeText(context, "Bildirim yok", android.widget.Toast.LENGTH_SHORT).show() }) { Icon(Icons.Rounded.Notifications, null, tint = MaterialTheme.colorScheme.onBackground) }
             Spacer(Modifier.width(4.dp))
-            Box(Modifier.size(28.dp).clip(CircleShape).background(Color(0xFF8E44AD)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(28.dp).clip(CircleShape).background(Color(0xFF8E44AD)).clickable { android.widget.Toast.makeText(context, "Sen sekmesine geç", android.widget.Toast.LENGTH_SHORT).show() }, contentAlignment = Alignment.Center) {
                 Text("E", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
             }
         }

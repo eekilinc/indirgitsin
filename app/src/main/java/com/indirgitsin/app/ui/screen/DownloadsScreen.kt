@@ -37,19 +37,37 @@ data class DownloadedFile(
     val file: File? = null
 )
 
+data class ActiveDownload(
+    val id: Long,
+    val name: String,
+    val bytesDownloaded: Long,
+    val totalBytes: Long,
+    val status: Int
+)
+
 @Composable
 fun DownloadsScreen() {
     val context = LocalContext.current
     var files by remember { mutableStateOf<List<DownloadedFile>>(emptyList()) }
+    var active by remember { mutableStateOf<List<ActiveDownload>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     fun refresh() {
         loading = true
         files = scanDownloads(context)
+        active = scanActiveDownloads(context)
         loading = false
     }
 
     LaunchedEffect(Unit) { refresh() }
+    // Aktif indirmeler varsa her saniye yenile
+    LaunchedEffect(active.isNotEmpty()) {
+        while (active.isNotEmpty()) {
+            kotlinx.coroutines.delay(1000)
+            active = scanActiveDownloads(context)
+            if (active.isEmpty()) files = scanDownloads(context)
+        }
+    }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -74,9 +92,19 @@ fun DownloadsScreen() {
             }
         }
 
+        // Aktif indirmeler - en ustte, Spotify tarzı
+        if (active.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("İndiriliyor • ${active.size} dosya", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                active.forEach { item ->
+                    ActiveDownloadCard(item)
+                }
+            }
+        }
+
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else if (files.isEmpty()) {
+        } else if (files.isEmpty() && active.isEmpty()) {
             Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), modifier = Modifier.size(64.dp)) {
@@ -182,6 +210,55 @@ private fun scanDownloads(context: Context): List<DownloadedFile> {
         }
     } catch (_: Exception) {}
     return result
+}
+
+private fun scanActiveDownloads(context: Context): List<ActiveDownload> {
+    val result = mutableListOf<ActiveDownload>()
+    try {
+        val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+        val q = android.app.DownloadManager.Query().setFilterByStatus(android.app.DownloadManager.STATUS_RUNNING or android.app.DownloadManager.STATUS_PAUSED or android.app.DownloadManager.STATUS_PENDING)
+        dm.query(q)?.use { c ->
+            val idIdx = c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_ID)
+            val titleIdx = c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TITLE)
+            val bytesIdx = c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+            val totalIdx = c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+            val statusIdx = c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS)
+            while (c.moveToNext()) {
+                val id = c.getLong(idIdx)
+                val name = c.getString(titleIdx) ?: "İndiriliyor"
+                val dl = c.getLong(bytesIdx)
+                val total = c.getLong(totalIdx)
+                val status = c.getInt(statusIdx)
+                result.add(ActiveDownload(id, name, dl, total, status))
+            }
+        }
+    } catch (_: Exception) {}
+    return result
+}
+
+@Composable
+private fun ActiveDownloadCard(item: ActiveDownload) {
+    val progress = if (item.totalBytes > 0) item.bytesDownloaded.toFloat() / item.totalBytes else 0f
+    val statusText = when (item.status) {
+        android.app.DownloadManager.STATUS_RUNNING -> "İndiriliyor"
+        android.app.DownloadManager.STATUS_PAUSED -> "Duraklatıldı"
+        android.app.DownloadManager.STATUS_PENDING -> "Beklemede"
+        else -> "İşleniyor"
+    }
+    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text("$statusText • ${formatSize(item.bytesDownloaded)} / ${if (item.totalBytes>0) formatSize(item.totalBytes) else "?"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                }
+                Text("${(progress*100).toInt()}%", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
+            }
+            LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)))
+        }
+    }
 }
 
 private fun playFile(context: Context, item: DownloadedFile) {
