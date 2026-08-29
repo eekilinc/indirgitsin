@@ -2,6 +2,7 @@ package com.indirgitsin.app
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.indirgitsin.app.data.extractor.NewPipePlaylistHelper
 import com.indirgitsin.app.data.extractor.YoutubeExtractor
 import com.indirgitsin.app.data.model.UiState
 import com.indirgitsin.app.util.YoutubeLinkHelper
@@ -36,18 +37,27 @@ class HomeViewModel : ViewModel() {
     fun fetch(url: String, context: android.content.Context) {
         val normalized = YoutubeLinkHelper.findYoutubeUrlInText(url) ?: url
         if (!YoutubeLinkHelper.isValidYoutubeUrl(normalized)) {
-            _uiState.value = UiState.Error("Geçerli bir YouTube / YouTube Music linki gir. Örn: https://youtu.be/...")
+            _uiState.value = UiState.Error("Geçerli bir YouTube / YouTube Music linki gir. Örn: https://youtu.be/... veya playlist linki")
             return
         }
+        val playlistId = YoutubeLinkHelper.extractPlaylistId(normalized)
         _uiState.value = UiState.Loading
         viewModelScope.launch {
+            // Once playlist dene
+            if (playlistId != null) {
+                val pl = NewPipePlaylistHelper.extract(playlistId)
+                if (pl != null && pl.videos.isNotEmpty()) {
+                    _uiState.value = UiState.PlaylistSuccess(pl)
+                    return@launch
+                }
+            }
+            // Video olarak dene
             val result = YoutubeExtractor.extract(normalized, context)
             result.onSuccess { video ->
                 if (video.streams.isEmpty()) {
                     _uiState.value = UiState.Error("Video bulundu ama indirilebilir akış bulunamadı. Farklı bir video dene.")
                 } else {
                     _uiState.value = UiState.Success(video)
-                    // Geçmişe kaydet (premium: otomatik, gizli)
                     try {
                         historyDao?.insert(
                             com.indirgitsin.app.data.history.HistoryEntity(

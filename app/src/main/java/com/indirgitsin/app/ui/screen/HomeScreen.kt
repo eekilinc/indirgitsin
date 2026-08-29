@@ -5,9 +5,10 @@ import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -123,6 +124,7 @@ fun HomeScreen(
                                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
                                 )
                             }
+                            is UiState.PlaylistSuccess -> YtPlaylistCard(playlist = state.playlist)
                             else -> YtEmptyState()
                         }
                     }
@@ -612,6 +614,86 @@ private fun YtOptionRow(label: String, sublabel: String, isVideo: Boolean, onCli
                 Spacer(Modifier.width(4.dp))
                 Text("İndir", fontWeight = FontWeight.Bold)
             }
+        }
+    }
+}
+
+@Composable
+private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var selected by remember { mutableStateOf(setOf<String>()) }
+    var downloading by remember { mutableStateOf(false) }
+    val allSelected = selected.size == playlist.videos.size && playlist.videos.isNotEmpty()
+    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(model = playlist.thumbnailUrl.ifBlank { "https://i.ytimg.com/vi/${playlist.videos.firstOrNull()?.id}/hqdefault.jpg" }, contentDescription = null, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(playlist.title, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Text("${playlist.author} • ${playlist.videos.size} video", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = allSelected, onClick = { selected = if (allSelected) emptySet() else playlist.videos.map { it.id }.toSet() }, label = { Text(if (allSelected) "Tümünü kaldır" else "Tümünü seç") })
+                Spacer(Modifier.weight(1f))
+                Text("${selected.size} seçili", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (playlist.videos.isEmpty()) {
+                Text("Bu çalma listesinde video yok", style = MaterialTheme.typography.bodySmall)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
+                    playlist.videos.forEach { v ->
+                        val isSel = selected.contains(v.id)
+                        Surface(onClick = { selected = if (isSel) selected - v.id else selected + v.id }, shape = RoundedCornerShape(12.dp), color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = isSel, onCheckedChange = { selected = if (it) selected + v.id else selected - v.id })
+                                AsyncImage(model = v.thumbnailUrl.ifBlank { "https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" }, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                Spacer(Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(v.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                    Text(v.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Button(
+                onClick = {
+                    if (selected.isEmpty()) {
+                        android.widget.Toast.makeText(context, "Önce video seç", android.widget.Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    downloading = true
+                    scope.launch {
+                        var ok = 0
+                        for (id in selected) {
+                            try {
+                                val info = com.indirgitsin.app.data.extractor.NewPipeHelper.extract(id)
+                                val best = info?.streams?.firstOrNull { it.isVideo } ?: info?.streams?.firstOrNull()
+                                if (info != null && best != null) {
+                                    com.indirgitsin.app.data.downloader.FileDownloader.enqueue(context, info, best)
+                                    ok++
+                                }
+                                kotlinx.coroutines.delay(600)
+                            } catch (_: Exception) {}
+                        }
+                        downloading = false
+                        android.widget.Toast.makeText(context, "$ok video kuyruğa eklendi • Bildirimden takip et", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                },
+                enabled = selected.isNotEmpty() && !downloading,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (downloading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                else Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (downloading) "Ekleniyor..." else "Seçilenleri İndir (${selected.size})", fontWeight = FontWeight.Bold)
+            }
+            Text("Sırayla indirilir • İndirilenler'den takip et", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

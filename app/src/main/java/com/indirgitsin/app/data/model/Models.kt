@@ -22,9 +22,26 @@ data class StreamOption(
     val bitrate: Int = 0
 )
 
+data class PlaylistVideo(
+    val id: String,
+    val title: String,
+    val thumbnailUrl: String = "",
+    val durationSeconds: Long = 0L
+)
+
+data class PlaylistInfo(
+    val id: String,
+    val title: String,
+    val author: String,
+    val thumbnailUrl: String,
+    val videos: List<PlaylistVideo>,
+    val videoCount: Int = 0
+)
+
 sealed class UiState {
     object Idle : UiState()
     object Loading : UiState()
     data class Success(val video: VideoInfo) : UiState()
+    data class PlaylistSuccess(val playlist: PlaylistInfo) : UiState()
     data class Error(val message: String) : UiState()
 }

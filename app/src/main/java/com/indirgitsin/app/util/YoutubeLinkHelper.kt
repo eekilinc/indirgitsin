@@ -21,7 +21,14 @@ object YoutubeLinkHelper {
         return null
     }
 
-    fun isValidYoutubeUrl(url: String?): Boolean = extractVideoId(url) != null
+    fun extractPlaylistId(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        return Regex("[?&]list=([a-zA-Z0-9_-]+)").find(url)?.groupValues?.get(1)
+    }
+
+    fun isPlaylistUrl(url: String?): Boolean = extractPlaylistId(url) != null
+
+    fun isValidYoutubeUrl(url: String?): Boolean = extractVideoId(url) != null || isPlaylistUrl(url)
 
     fun normalizeUrl(url: String): String {
         val id = extractVideoId(url) ?: return url
@@ -30,7 +37,7 @@ object YoutubeLinkHelper {
 
     fun findYoutubeUrlInText(text: String?): String? {
         if (text.isNullOrBlank()) return null
-        val regex = Regex("""https?://(?:www\.|m\.|music\.)?(?:youtube\.com/watch\?[^ \n]+|youtu\.be/[^ \n]+|youtube\.com/shorts/[^ \n]+)""")
+        val regex = Regex("""https?://(?:www\.|m\.|music\.)?(?:youtube\.com/watch\?[^ \n]+|youtu\.be/[^ \n]+|youtube\.com/shorts/[^ \n]+|youtube\.com/playlist\?[^ \n]+)""")
         return regex.find(text)?.value
     }
 
