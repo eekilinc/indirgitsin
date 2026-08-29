@@ -47,11 +47,4 @@ object ZemerCipherHelper {
             urlWithItag // fallback: URL'i itag ile
         }
     }
-}: Exception) {
-            urlWithItag
-        }
-    }
-
-    // Player config store durumu
-    fun isInitialized(): Boolean = initialized
 }
