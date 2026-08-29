@@ -15,6 +15,7 @@ object SettingsStore {
     private val KEY_AUTO_HIGH = booleanPreferencesKey("auto_high_quality")
     private val KEY_AUDIO_FORMAT = stringPreferencesKey("audio_format")
     private val KEY_DOWNLOAD_SUBFOLDER = stringPreferencesKey("download_subfolder")
+    private val KEY_THEME = stringPreferencesKey("theme")
 
     fun autoHighFlow(context: Context): Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AUTO_HIGH] ?: true }
     suspend fun setAutoHigh(context: Context, value: Boolean) { context.settingsDataStore.edit { it[KEY_AUTO_HIGH] = value } }
@@ -25,4 +26,7 @@ object SettingsStore {
     fun downloadSubfolderFlow(context: Context): Flow<String> = context.settingsDataStore.data.map { it[KEY_DOWNLOAD_SUBFOLDER] ?: "IndirGitsin" }
     suspend fun setDownloadSubfolder(context: Context, value: String) { context.settingsDataStore.edit { it[KEY_DOWNLOAD_SUBFOLDER] = value.take(30).replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "IndirGitsin" } } }
     suspend fun getDownloadSubfolderNow(context: Context): String = try { downloadSubfolderFlow(context).first() } catch (_: Exception) { "IndirGitsin" }
+
+    fun themeFlow(context: Context): Flow<String> = context.settingsDataStore.data.map { it[KEY_THEME] ?: "dark" }
+    suspend fun setTheme(context: Context, value: String) { context.settingsDataStore.edit { it[KEY_THEME] = value } }
 }

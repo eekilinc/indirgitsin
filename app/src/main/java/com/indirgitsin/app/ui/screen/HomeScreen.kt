@@ -85,6 +85,9 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
+            // Premium hero - Spotify/YouTube tarzı
+            item { YtPremiumHero() }
+
             // Search bar - YouTube search style
             item {
                 YtSearchBar(
@@ -180,10 +183,30 @@ private fun YtTopBar() {
                 }
             }
             Spacer(Modifier.weight(1f))
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(32.dp).clickable { android.widget.Toast.makeText(context, "Ayarlar yakında", android.widget.Toast.LENGTH_SHORT).show() }) {
+        }
+    }
+}
+
+@Composable
+private fun YtPremiumHero() {
+    val gradient = Brush.linearGradient(listOf(Color(0xFF1A1A1A), Color(0xFF2D0B0B)))
+    Box(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(16.dp)).background(gradient).padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = CircleShape, color = YtRed, modifier = Modifier.size(40.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Rounded.Settings, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Bolt, null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Premium • Hızlı • Güvenli", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleSmall)
+                Text("Saniyeler içinde indir, reklamsız izle", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
+            }
+            Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+                Text(" PRO ", color = YtRed, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
             }
         }
     }

@@ -32,10 +32,31 @@ fun SettingsScreen() {
     val version = remember { try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0" } catch (_: Exception) { "1.0.0" } }
     var checking by remember { mutableStateOf(false) }
     var manualUpdate by remember { mutableStateOf<com.indirgitsin.app.util.UpdateChecker.UpdateInfo?>(null) }
+    val theme by SettingsStore.themeFlow(context).collectAsState(initial = "dark")
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Ayarlar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
         Text("Premium deneyim • YouTube & Spotify tarzı", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        // Tema secimi - acik/koyu/sistem
+        PremiumSettingCard(
+            icon = Icons.Rounded.DarkMode,
+            title = "Tema",
+            subtitle = when (theme) { "light" -> "Açık tema"; "dark" -> "Koyu tema"; else -> "Sistem teması" },
+            action = {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("light" to "Açık", "dark" to "Koyu", "system" to "Sistem").forEach { (v, label) ->
+                        val selected = theme == v
+                        FilterChip(
+                            selected = selected,
+                            onClick = { scope.launch { SettingsStore.setTheme(context, v) } },
+                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+                }
+            }
+        )
 
         PremiumSettingCard(
             icon = Icons.Rounded.Folder,
@@ -183,7 +204,12 @@ fun SettingsScreen() {
                             Toast.makeText(context, "github.com/eekilinc/indirgitsin", Toast.LENGTH_SHORT).show()
                         }
                     }, label = { Text("GitHub") }, leadingIcon = { Icon(Icons.Rounded.Code, null, modifier = Modifier.size(16.dp)) })
-                    Text("github.com/eekilinc/indirgitsin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eekilinc/indirgitsin"))
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                    }) { Text("github.com/eekilinc/indirgitsin", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
                 }
             }
         }

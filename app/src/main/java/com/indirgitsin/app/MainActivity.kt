@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -16,10 +17,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.history.AppDatabase
 import com.indirgitsin.app.ui.navigation.AppNavHost
 import com.indirgitsin.app.ui.navigation.Screen
@@ -49,7 +52,10 @@ class MainActivity : ComponentActivity() {
         checkClipboard()
 
         setContent {
-            IndirGitsinTheme(darkTheme = true) {
+            val context = LocalContext.current
+            val themePref by SettingsStore.themeFlow(context).collectAsState(initial = "dark")
+            val isDark = when (themePref) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
+            IndirGitsinTheme(darkTheme = isDark) {
                 val navController = rememberNavController()
                 val backStack by navController.currentBackStackEntryAsState()
                 val currentRoute = backStack?.destination?.route
