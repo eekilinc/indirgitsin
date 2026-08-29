@@ -6,6 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -624,6 +625,8 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
     val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf(setOf<String>()) }
     var downloading by remember { mutableStateOf(false) }
+    var addedCount by remember { mutableStateOf(0) }
+    var currentProcessing by remember { mutableStateOf("") }
     val allSelected = selected.size == playlist.videos.size && playlist.videos.isNotEmpty()
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -646,14 +649,33 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
                     playlist.videos.forEach { v ->
                         val isSel = selected.contains(v.id)
-                        Surface(onClick = { selected = if (isSel) selected - v.id else selected + v.id }, shape = RoundedCornerShape(12.dp), color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+                        val isProcessing = downloading && currentProcessing == v.id
+                        val isDone = addedCount > 0 && !downloading && selected.contains(v.id)
+                        Surface(onClick = { if (!downloading) selected = if (isSel) selected - v.id else selected + v.id }, shape = RoundedCornerShape(12.dp), color = when {
+                            isProcessing -> MaterialTheme.colorScheme.primaryContainer
+                            isDone -> MaterialTheme.colorScheme.tertiaryContainer
+                            isSel -> MaterialTheme.colorScheme.primaryContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }, modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = isSel, onCheckedChange = { selected = if (it) selected + v.id else selected - v.id })
+                                if (isProcessing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                } else if (isDone) {
+                                    Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
+                                } else {
+                                    Checkbox(checked = isSel, onCheckedChange = { if (!downloading) selected = if (it) selected + v.id else selected - v.id })
+                                }
                                 AsyncImage(model = v.thumbnailUrl.ifBlank { "https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" }, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
                                 Spacer(Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(v.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                                    Text(v.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (isProcessing) {
+                                        Text("Kuyruğa ekleniyor...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    } else if (isDone) {
+                                        Text("Kuyruğa eklendi", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                    } else {
+                                        Text(v.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
                             }
                         }
@@ -667,20 +689,24 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                         return@Button
                     }
                     downloading = true
+                    addedCount = 0
                     scope.launch {
                         var ok = 0
                         for (id in selected) {
                             try {
+                                currentProcessing = id
                                 val info = com.indirgitsin.app.data.extractor.NewPipeHelper.extract(id)
                                 val best = info?.streams?.firstOrNull { it.isVideo } ?: info?.streams?.firstOrNull()
                                 if (info != null && best != null) {
                                     com.indirgitsin.app.data.downloader.FileDownloader.enqueue(context, info, best)
                                     ok++
                                 }
+                                addedCount++
                                 kotlinx.coroutines.delay(600)
                             } catch (_: Exception) {}
                         }
                         downloading = false
+                        currentProcessing = ""
                         android.widget.Toast.makeText(context, "$ok video kuyruğa eklendi • Bildirimden takip et", android.widget.Toast.LENGTH_LONG).show()
                     }
                 },
@@ -688,12 +714,36 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                if (downloading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                else Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
+                if (downloading) {
+                    Row(Modifier.width(16.dp).align(Alignment.CenterVertically)) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                    }
+                } else {
+                    Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
+                }
                 Spacer(Modifier.width(8.dp))
-                Text(if (downloading) "Ekleniyor..." else "Seçilenleri İndir (${selected.size})", fontWeight = FontWeight.Bold)
+                Text(
+                    when {
+                        downloading -> "Ekleniyor... ($addedCount/${selected.size})"
+                        addedCount > 0 -> "Eklendi ($addedCount) • İndirilenler'e git"
+                        else -> "Seçilenleri İndir (${selected.size})"
+                    },
+                    fontWeight = FontWeight.Bold
+                )
             }
-            Text("Sırayla indirilir • İndirilenler'den takip et", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (addedCount > 0 && !downloading) {
+                TextButton(
+                    onClick = {
+                        // Navigate to Downloads tab - parent should handle this
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("İndirilenler Sekmesine Git", fontWeight = FontWeight.Bold)
+                    Icon(Icons.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp))
+                }
+            } else {
+                Text("Sırayla indirilir • İndirilenler'den takip et", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
