@@ -23,9 +23,6 @@ sealed class Screen(val route: String) {
     object History : Screen("history")
     object Downloads : Screen("downloads")
     object Settings : Screen("settings")
-    object Player : Screen("player/{uri}") {
-        fun createRoute(uri: String) = "player/${URLEncoder.encode(uri, StandardCharsets.UTF_8.toString())}"
-    }
 }
 
 @Composable
@@ -81,10 +78,12 @@ fun AppNavHost(
         composable(
             route = Screen.Player.route,
             arguments = listOf(
-                androidx.navigation.NavArgument("uri") { type = androidx.navigation.NavType.StringType }
+                androidx.navigation.navArgument("uri") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("title") { type = androidx.navigation.NavType.StringType }
             )
         ) { backStackEntry ->
             val uri = backStackEntry.arguments?.getString("uri") ?: ""
+            val title = backStackEntry.arguments?.getString("title") ?: "Oynatıcı"
             VideoPlayerScreen(videoUri = Uri.parse(java.net.URLDecoder.decode(uri, "UTF-8")))
         }
     }

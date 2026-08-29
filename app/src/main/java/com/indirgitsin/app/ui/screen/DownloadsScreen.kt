@@ -145,7 +145,7 @@ fun DownloadsScreen(navController: NavController) {
                 items(files, key = { it.name + it.dateMillis }) { item ->
                     DownloadCard(item = item, onPlay = {
                         val encodedUri = URLEncoder.encode(item.uri.toString(), StandardCharsets.UTF_8.toString())
-                        navController.navigate(Screen.VideoPlayer.createRoute(encodedUri, item.name))
+                        navController.navigate(com.indirgitsin.app.ui.navigation.Screen.Player.createRoute(encodedUri, item.name))
                     }, onShare = { shareFile(context, item) }, onDelete = {
                         deleteFile(context, item)
                         refresh()
