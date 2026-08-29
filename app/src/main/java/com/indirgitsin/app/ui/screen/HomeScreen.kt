@@ -82,9 +82,6 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            // Premium banner - YouTube Premium style
-            item { YtPremiumBanner() }
-
             // Search bar - YouTube search style
             item {
                 YtSearchBar(

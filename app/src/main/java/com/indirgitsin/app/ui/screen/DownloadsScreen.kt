@@ -54,8 +54,12 @@ fun DownloadsScreen() {
 
     fun refresh() {
         loading = true
-        files = scanDownloads(context)
-        active = scanActiveDownloads(context)
+        val activeNow = scanActiveDownloads(context)
+        active = activeNow
+        val allFiles = scanDownloads(context)
+        // Bitmeden asagiya ekleme: aktif isimde olan dosyalari tamamlanan listeden cikar
+        val activeNames = activeNow.map { it.name }.toSet()
+        files = allFiles.filterNot { f -> activeNames.contains(f.name) }
         loading = false
     }
 
@@ -65,7 +69,11 @@ fun DownloadsScreen() {
         while (active.isNotEmpty()) {
             kotlinx.coroutines.delay(1000)
             active = scanActiveDownloads(context)
-            if (active.isEmpty()) files = scanDownloads(context)
+            if (active.isEmpty()) {
+                val allFiles = scanDownloads(context)
+                val activeNames = active.map { it.name }.toSet()
+                files = allFiles.filterNot { f -> activeNames.contains(f.name) }
+            }
         }
     }
 
@@ -103,8 +111,11 @@ fun DownloadsScreen() {
                             dm.remove(item.id)
                             Toast.makeText(context, "İptal edildi: ${item.name}", Toast.LENGTH_SHORT).show()
                         } catch (_: Exception) {}
-                        active = scanActiveDownloads(context)
-                        files = scanDownloads(context)
+                        val an = scanActiveDownloads(context)
+                        active = an
+                        val all = scanDownloads(context)
+                        val anNames = an.map { it.name }.toSet()
+                        files = all.filterNot { f -> anNames.contains(f.name) }
                     })
                 }
             }

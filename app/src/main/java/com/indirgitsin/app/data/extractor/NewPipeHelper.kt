@@ -71,12 +71,14 @@ object NewPipeHelper {
                 // orijinal format
                 streams.add(StreamOption("Ses • ${baseExt.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(), baseExt, q, url, false, true, bitrate = bitrate))
                 // mp3 secenegi yoksa ekle (ayni url, mp3 etiketli) - kullanici mp3 arıyor
-                if (baseExt != "mp3" && bitrate > 0) {
-                    streams.add(StreamOption("Ses • MP3 ${bitrate}kbps", "mp3", "${bitrate}kbps", url, false, true, bitrate = bitrate))
+                if (baseExt != "mp3") {
+                    val mp3Q = if (bitrate > 0) "${bitrate}kbps" else q.ifBlank { "128kbps" }
+                    val mp3Bitrate = if (bitrate > 0) bitrate else 128
+                    streams.add(StreamOption("Ses • MP3 $mp3Q", "mp3", mp3Q, url, false, true, bitrate = mp3Bitrate))
                 }
             }
             if (streams.isEmpty()) return@withContext null
-            val sorted = streams.distinctBy { it.url }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) }.thenByDescending { it.bitrate })
+            val sorted = streams.distinctBy { it.url to it.extension }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) }.thenByDescending { it.bitrate })
             VideoInfo(videoId, title, author, thumb, duration, 0L, "https://www.youtube.com/watch?v=$videoId", sorted)
         } catch (e: Exception) {
             null
