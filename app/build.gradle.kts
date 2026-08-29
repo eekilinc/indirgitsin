@@ -65,6 +65,7 @@ dependencies {
 
     // zemer-cipher: YouTube cipher + PoToken (composite build from cipher/ submodule)
     implementation("com.zemer:cipher")
+    implementation("com.jakewharton.timber:timber:5.0.1")
 
     // DataStore (ayarlar)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
