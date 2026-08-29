@@ -41,11 +41,11 @@ fun HomeScreen(
     inputUrl: String,
     onInputChange: (String) -> Unit,
     uiState: UiState,
-    onFetch: (String, Context) -> Unit,
+    onFetch: (String) -> Unit,
     onDownload: (VideoInfo, StreamOption) -> Unit,
     onPaste: () -> Unit,
     historyDao: HistoryDao? = null,
-    onHistoryClick: (String, Context) -> Unit = { _, _ -> }
+    onHistoryClick: (String) -> Unit = {}
 ) {
     var showSheet by remember { mutableStateOf(false) }
     var selectedVideo by remember { mutableStateOf<VideoInfo?>(null) }
@@ -59,7 +59,7 @@ fun HomeScreen(
         val url = YoutubeLinkHelper.findYoutubeUrlInText(text) ?: text
         if (!url.isNullOrBlank()) {
             onInputChange(url)
-            if (YoutubeLinkHelper.isValidYoutubeUrl(url)) onFetch(url, context)
+            if (YoutubeLinkHelper.isValidYoutubeUrl(url)) onFetch(url)
         }
         onPaste()
     }
@@ -350,7 +350,7 @@ private fun YtEmptyState() {
 }
 
 @Composable
-private fun YtRecentSection(historyDao: HistoryDao?, onHistoryClick: (String, Context) -> Unit) {
+private fun YtRecentSection(historyDao: HistoryDao?, onHistoryClick: (String) -> Unit) {
     var recent by remember { mutableStateOf<List<com.indirgitsin.app.data.history.HistoryEntity>>(emptyList()) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(historyDao) { historyDao?.observeHistory()?.collect { recent = it.take(4) } }
@@ -367,7 +367,7 @@ private fun YtRecentSection(historyDao: HistoryDao?, onHistoryClick: (String, Co
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 recent.forEach { item ->
-                    YtHistoryRow(item = item, onClick = { onHistoryClick(item.url, context) })
+                    YtHistoryRow(item = item, onClick = { onHistoryClick(item.url) })
                 }
             }
         }

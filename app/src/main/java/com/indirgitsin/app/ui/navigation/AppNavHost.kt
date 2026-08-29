@@ -3,6 +3,7 @@ package com.indirgitsin.app.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,6 +30,9 @@ fun AppNavHost(
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val inputUrl by homeViewModel.inputUrl.collectAsState()
+    // Context'i composable scope'ta BİR KEZ alıp lambda'lara capture et
+    // (LocalContext.current çağrısı non-@Composable lambda içinde yapılamaz)
+    val context = LocalContext.current
 
     NavHost(navController = navController, startDestination = Screen.Home.route) {
         composable(Screen.Home.route) {
@@ -36,13 +40,13 @@ fun AppNavHost(
                 inputUrl = inputUrl,
                 onInputChange = homeViewModel::onInputChange,
                 uiState = uiState,
-                onFetch = { url -> homeViewModel.fetch(url, androidx.compose.ui.platform.LocalContext.current) },
+                onFetch = { url -> homeViewModel.fetch(url, context) },
                 onDownload = onDownload,
                 onPaste = { /* handled in MainActivity */ },
                 historyDao = historyDao,
                 onHistoryClick = { url ->
                     homeViewModel.onInputChange(url)
-                    homeViewModel.fetch(url, androidx.compose.ui.platform.LocalContext.current)
+                    homeViewModel.fetch(url, context)
                 }
             )
         }
@@ -53,7 +57,7 @@ fun AppNavHost(
                     val url = entity.url
                     navController.navigate(Screen.Home.route)
                     homeViewModel.onInputChange(url)
-                    homeViewModel.fetch(url, androidx.compose.ui.platform.LocalContext.current)
+                    homeViewModel.fetch(url, context)
                 }
             )
         }
