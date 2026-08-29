@@ -41,6 +41,8 @@ object YoutubeExtractor {
         try {
             // zemer-cipher initialize (PlayerConfigStore) - SABR URL çözümlemesi için
             ZemerCipherHelper.initialize(context)
+            // WebView'ı arka planda hazırla
+            com.zemer.cipher.CipherDeobfuscator.prewarm()
             
             val normalized = YoutubeLinkHelper.normalizeUrl(url)
             val videoId = YoutubeLinkHelper.extractVideoId(normalized)

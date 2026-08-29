@@ -43,7 +43,7 @@ object FileDownloader {
                     .build()
 
                 val response = client.newCall(request).execute()
-                if (!response.isSuccessful) throw Exception("Sunucu hatası: ${response.code}")
+                if (!response.isSuccessful) throw Exception("Sunucu hatası: ${response.code} - ${response.message}")
 
                 val body = response.body ?: throw Exception("Boş yanıt")
                 val input = body.byteStream()
