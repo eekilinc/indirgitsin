@@ -47,6 +47,39 @@ fun SettingsScreen() {
             action = { Icon(Icons.Rounded.VerifiedUser, null, tint = MaterialTheme.colorScheme.primary) }
         )
 
+        // Hakkinda - GitHub vs
+        Card(
+            onClick = {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/eekilinc/indirgitsin"))
+                    context.startActivity(intent)
+                } catch (_: Exception) { yakinda() }
+            },
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(1.dp)
+        ) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF24292F), modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(Icons.Rounded.Code, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Hakkında", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text("github.com/eekilinc/indirgitsin • Açık kaynak • v1.0.0", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Rounded.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        PremiumSettingCard(
+            icon = Icons.Rounded.Info,
+            title = "Lisans",
+            subtitle = "MIT • Sadece izinli içerikler için kullanın",
+            action = {}
+        )
+
         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.Info, null, tint = MaterialTheme.colorScheme.primary)

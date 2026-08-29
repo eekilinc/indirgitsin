@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
         BottomItem(Screen.Home.route, "Ana Sayfa", Icons.Rounded.Home, Icons.Rounded.Home),
         BottomItem(Screen.History.route, "Kitaplık", Icons.Rounded.VideoLibrary, Icons.Rounded.VideoLibrary),
         BottomItem(Screen.Downloads.route, "İndirilenler", Icons.Rounded.Download, Icons.Rounded.DownloadDone),
-        BottomItem(Screen.Settings.route, "Sen", Icons.Rounded.AccountCircle, Icons.Rounded.AccountCircle)
+        BottomItem(Screen.Settings.route, "Ayarlar", Icons.Rounded.Settings, Icons.Rounded.Settings)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

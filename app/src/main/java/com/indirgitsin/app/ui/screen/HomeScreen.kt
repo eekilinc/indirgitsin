@@ -68,8 +68,11 @@ fun HomeScreen(
     LaunchedEffect(uiState) {
         if (uiState is UiState.Success) {
             selectedVideo = uiState.video
-            showSheet = true
             selectedTab = 0
+            // sheet otomatik acilmasin - sadece Indir'e basinca acilsin
+        } else if (uiState is UiState.Loading || uiState is UiState.Idle) {
+            // yuklenirken onceki sheet'i gizle
+            showSheet = false
         }
     }
 
