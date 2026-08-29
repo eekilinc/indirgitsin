@@ -164,7 +164,8 @@ fun HomeScreen(
             selectedTab = selectedTab,
             onTabChange = { selectedTab = it },
             onDismiss = { showSheet = false },
-            onDownload = { opt -> onDownload(selectedVideo!!, opt); showSheet = false }
+            onDownload = { opt -> onDownload(selectedVideo!!, opt); showSheet = false },
+            onPreview = { /* handled inside sheet now via direct intent */ }
         )
     }
 }
@@ -547,7 +548,8 @@ private fun YtDownloadSheet(
     selectedTab: Int,
     onTabChange: (Int) -> Unit,
     onDismiss: () -> Unit,
-    onDownload: (StreamOption) -> Unit
+    onDownload: (StreamOption) -> Unit,
+    onPreview: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
@@ -562,6 +564,13 @@ private fun YtDownloadSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(video.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                     Text(video.author, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(video.url))
+                    context.startActivity(intent)
+                }) {
+                    Icon(Icons.Rounded.PlayCircle, null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
             // YouTube Premium style segmented

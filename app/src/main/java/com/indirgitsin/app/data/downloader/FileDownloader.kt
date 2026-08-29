@@ -2,17 +2,17 @@ package com.indirgitsin.app.data.downloader
 
 import android.content.Context
 import android.os.Environment
-import android.widget.Toast
-import com.indirgitsin.app.data.SettingsStore
-import com.indirgitsin.app.data.model.StreamOption
-import com.indirgitsin.app.data.model.VideoInfo
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import okhttp3.OkHttpClient
-import java.util.concurrent.TimeUnit
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import com.indirgitsin.app.R
+import com.indirgitsin.app.MainActivity
 
 object FileDownloader {
 
@@ -26,6 +26,14 @@ object FileDownloader {
         val ext = option.extension.ifBlank { if (option.isAudioOnly) "m4a" else "mp4" }
         val qualityPart = option.quality.ifBlank { option.label.replace(" ", "_").take(20) }
         val fileName = "${safeTitle}_${qualityPart}.$ext".replace(Regex("[^a-zA-Z0-9._-]"), "_")
+
+        // Register Receiver for completion
+        context.registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                showNotification(context, fileName)
+                context.unregisterReceiver(this)
+            }
+        }, IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED)
 
         CoroutineScope(Dispatchers.Main).launch {
             val subfolder = try { withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin" } catch (_: Exception) { "IndirGitsin" }
@@ -46,11 +54,26 @@ object FileDownloader {
                     addRequestHeader("Origin", "https://www.youtube.com")
                 }
                 dm.enqueue(request)
-                Toast.makeText(context, "İndiriliyor: $fileName\n$relative • Bildirimden takip et", Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(context, "İndiriliyor: $fileName", android.widget.Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 e.printStackTrace()
-                Toast.makeText(context, "İndirme hatası: ${e.message}", Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(context, "İndirme hatası: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun showNotification(context: Context, fileName: String) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "indirgitsin_dl"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, "İndirmeler", NotificationManager.IMPORTANCE_HIGH)
+            manager.createNotificationChannel(channel)
+        }
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle("İndirme Tamamlandı")
+            .setContentText(fileName)
+            .setAutoCancel(true)
+        manager.notify(fileName.hashCode(), builder.build())
     }
 }

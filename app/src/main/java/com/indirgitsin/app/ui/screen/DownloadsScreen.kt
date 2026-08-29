@@ -24,7 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.navigation.NavController
+import com.indirgitsin.app.ui.navigation.Screen
 import java.io.File
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -46,7 +50,7 @@ data class ActiveDownload(
 )
 
 @Composable
-fun DownloadsScreen() {
+fun DownloadsScreen(navController: NavController) {
     val context = LocalContext.current
     var files by remember { mutableStateOf<List<DownloadedFile>>(emptyList()) }
     var active by remember { mutableStateOf<List<ActiveDownload>>(emptyList()) }
@@ -139,7 +143,10 @@ fun DownloadsScreen() {
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
                 items(files, key = { it.name + it.dateMillis }) { item ->
-                    DownloadCard(item = item, onPlay = { playFile(context, item) }, onShare = { shareFile(context, item) }, onDelete = {
+                    DownloadCard(item = item, onPlay = {
+                        val encodedUri = URLEncoder.encode(item.uri.toString(), StandardCharsets.UTF_8.toString())
+                        navController.navigate(Screen.VideoPlayer.createRoute(encodedUri, item.name))
+                    }, onShare = { shareFile(context, item) }, onDelete = {
                         deleteFile(context, item)
                         refresh()
                     })

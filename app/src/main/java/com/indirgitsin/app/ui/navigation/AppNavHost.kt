@@ -14,12 +14,18 @@ import com.indirgitsin.app.data.model.VideoInfo
 import com.indirgitsin.app.ui.screen.HistoryScreen
 import com.indirgitsin.app.ui.screen.HomeScreen
 import com.indirgitsin.app.ui.screen.SettingsScreen
+import com.indirgitsin.app.ui.screen.VideoPlayerScreen
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object History : Screen("history")
     object Downloads : Screen("downloads")
     object Settings : Screen("settings")
+    object Player : Screen("player/{uri}") {
+        fun createRoute(uri: String) = "player/${URLEncoder.encode(uri, StandardCharsets.UTF_8.toString())}"
+    }
 }
 
 @Composable
@@ -71,6 +77,15 @@ fun AppNavHost(
         }
         composable(Screen.Settings.route) {
             SettingsScreen()
+        }
+        composable(
+            route = Screen.Player.route,
+            arguments = listOf(
+                androidx.navigation.NavArgument("uri") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val uri = backStackEntry.arguments?.getString("uri") ?: ""
+            VideoPlayerScreen(videoUri = Uri.parse(java.net.URLDecoder.decode(uri, "UTF-8")))
         }
     }
 }
