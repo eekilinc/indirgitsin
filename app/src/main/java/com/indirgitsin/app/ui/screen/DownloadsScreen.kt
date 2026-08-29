@@ -97,7 +97,15 @@ fun DownloadsScreen() {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("İndiriliyor • ${active.size} dosya", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 active.forEach { item ->
-                    ActiveDownloadCard(item)
+                    ActiveDownloadCard(item, onCancel = {
+                        try {
+                            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                            dm.remove(item.id)
+                            Toast.makeText(context, "İptal edildi: ${item.name}", Toast.LENGTH_SHORT).show()
+                        } catch (_: Exception) {}
+                        active = scanActiveDownloads(context)
+                        files = scanDownloads(context)
+                    })
                 }
             }
         }
@@ -237,7 +245,7 @@ private fun scanActiveDownloads(context: Context): List<ActiveDownload> {
 }
 
 @Composable
-private fun ActiveDownloadCard(item: ActiveDownload) {
+private fun ActiveDownloadCard(item: ActiveDownload, onCancel: () -> Unit) {
     val progress = if (item.totalBytes > 0) item.bytesDownloaded.toFloat() / item.totalBytes else 0f
     val statusText = when (item.status) {
         android.app.DownloadManager.STATUS_RUNNING -> "İndiriliyor"
@@ -255,6 +263,7 @@ private fun ActiveDownloadCard(item: ActiveDownload) {
                     Text("$statusText • ${formatSize(item.bytesDownloaded)} / ${if (item.totalBytes>0) formatSize(item.totalBytes) else "?"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
                 }
                 Text("${(progress*100).toInt()}%", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
+                IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = "İptal", tint = MaterialTheme.colorScheme.onPrimaryContainer) }
             }
             LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)))
         }

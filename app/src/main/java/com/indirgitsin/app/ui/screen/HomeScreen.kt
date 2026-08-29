@@ -173,16 +173,13 @@ private fun YtTopBar() {
                     Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                 }
                 Spacer(Modifier.width(4.dp))
-                Text("Premium", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text("İndir Gitsin", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(6.dp))
                 Surface(shape = RoundedCornerShape(4.dp), color = YtRed) {
                     Text("  PREMIUM  ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                 }
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { android.widget.Toast.makeText(context, "Arama: yukarıdaki çubuğa link yapıştır", android.widget.Toast.LENGTH_SHORT).show() }) { Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.onBackground) }
-            IconButton(onClick = { android.widget.Toast.makeText(context, "Bildirim yok", android.widget.Toast.LENGTH_SHORT).show() }) { Icon(Icons.Rounded.Notifications, null, tint = MaterialTheme.colorScheme.onBackground) }
-            Spacer(Modifier.width(4.dp))
             Box(Modifier.size(28.dp).clip(CircleShape).background(Color(0xFF8E44AD)).clickable { android.widget.Toast.makeText(context, "Sen sekmesine geç", android.widget.Toast.LENGTH_SHORT).show() }, contentAlignment = Alignment.Center) {
                 Text("E", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
             }
@@ -192,10 +189,11 @@ private fun YtTopBar() {
 
 @Composable
 private fun YtPremiumBanner() {
+    val context = LocalContext.current
     val gradient = Brush.horizontalGradient(listOf(Color(0xFFFF0000), Color(0xFFCC0000)))
     Box(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(12.dp)).background(gradient).padding(14.dp)
+            .clip(RoundedCornerShape(12.dp)).background(gradient).clickable { android.widget.Toast.makeText(context, "İndirdiğin videoları reklamsız, offline ve arka planda oynat", android.widget.Toast.LENGTH_SHORT).show() }.padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Box(
