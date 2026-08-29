@@ -103,7 +103,7 @@ object YoutubeExtractor {
     }
 
     // Innertube - çoklu client dene (ANDROID en iyi, sonra IOS/WEB fallback - cipher sorunu için)
-    private fun tryInnertube(videoId: String): VideoInfo? {
+    private suspend fun tryInnertube(videoId: String): VideoInfo? {
         val clients = listOf(
             // ANDROID - genellikle deciphered URL verir
             Triple("ANDROID", "19.09.37", "com.google.android.youtube/19.09.37 (Linux; U; Android 13) gzip"),
@@ -123,7 +123,7 @@ object YoutubeExtractor {
         return null
     }
 
-    private fun tryInnertubeWithClient(videoId: String, clientName: String, clientVersion: String, userAgent: String): VideoInfo? {
+    private suspend fun tryInnertubeWithClient(videoId: String, clientName: String, clientVersion: String, userAgent: String): VideoInfo? {
         return try {
             val clientJson = JSONObject().apply {
                 put("clientName", clientName)
@@ -250,13 +250,10 @@ object YoutubeExtractor {
                         url = serverAbr + "&itag=" + itag
                     }
                     if (url.isBlank()) continue
-                    // SABR URL'leri zemer-cipher ile deobfuscate et (async, ama burada sync çalışıyor)
-                    // Not: tryInnertube zaten Dispatchers.IO'da çalışıyor, deobfuscate de IO yapar
+                    // SABR URL'leri zemer-cipher ile deobfuscate et (n-transform)
                     if (isSabr) {
                         try {
-                            url = withContext(Dispatchers.IO) {
-                                ZemerCipherHelper.deobfuscateSabrUrlWithItag(serverAbr, itag)
-                            }
+                            url = ZemerCipherHelper.deobfuscateSabrUrlWithItag(serverAbr, itag)
                         } catch (_: Exception) {
                             // fallback: orijinal URL
                         }

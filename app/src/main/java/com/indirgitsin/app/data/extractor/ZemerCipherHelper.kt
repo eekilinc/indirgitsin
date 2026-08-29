@@ -2,49 +2,36 @@ package com.indirgitsin.app.data.extractor
 
 import android.content.Context
 import com.zemer.cipher.CipherDeobfuscator
-import com.zemer.cipher.PlayerConfigStore
+import com.zemer.cipher.ZemerCipher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.util.concurrent.TimeUnit
 
 object ZemerCipherHelper {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
-
     private var initialized = false
 
-    suspend fun initialize(context: Context) {
-        if (initialized) return
+    suspend fun initialize(context: Context) = withContext(Dispatchers.IO) {
+        if (initialized) return@withContext
         try {
-            PlayerConfigStore.initialize(context)
+            // ZemerCipher.initialize -> CipherDeobfuscator + PlayerConfigStore + PlayerDatesStore
+            ZemerCipher.initialize(context.applicationContext)
             initialized = true
         } catch (e: Exception) {
-            // zemer-cipher initialize başarısız olursa uygulama devam etsin
+            initialized = false
         }
     }
 
-    // SABR URL'yi (serverAbrStreamingUrl) CipherDeobfuscator ile çöz
-    // zemer-cipher: CipherDeobfuscator.deobfuscateStreamUrl(sabrUrl) -> gerçek indirme URL'si
-    suspend fun deobfuscateSabrUrl(sabrUrl: String): String = withContext(Dispatchers.IO) {
-        try {
-            CipherDeobfuscator.deobfuscateStreamUrl(sabrUrl)
-        } catch (e: Exception) {
-            sabrUrl // fallback: orijinal URL
-        }
-    }
-
-    // Adaptive format'lerden itag bazlı SABR URL oluştur + çöz
+    // SABR URL (serverAbrStreamingUrl + itag) içindeki n-parametresini dönüştür.
+    // zemer-cipher CipherDeobfuscator.transformNParamInUrl(url) -> n-transform + 403/limit aşımı.
+    // deobfuscateStreamUrl, signatureCipher (s/sp/url) string'i ister; SABR URL'si zaten tam URL
+    // olduğu için n-transform yeterlidir.
     suspend fun deobfuscateSabrUrlWithItag(baseSabrUrl: String, itag: String): String = withContext(Dispatchers.IO) {
         val urlWithItag = if (baseSabrUrl.contains("?")) "$baseSabrUrl&itag=$itag" else "$baseSabrUrl?itag=$itag"
         try {
-            CipherDeobfuscator.deobfuscateStreamUrl(urlWithItag)
+            val transformed = CipherDeobfuscator.transformNParamInUrl(urlWithItag)
+            if (transformed.isNullOrBlank()) urlWithItag else transformed
         } catch (e: Exception) {
-            urlWithItag // fallback: URL'i itag ile
+            urlWithItag
         }
     }
 }
