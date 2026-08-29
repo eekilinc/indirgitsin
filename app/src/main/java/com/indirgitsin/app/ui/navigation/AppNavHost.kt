@@ -1,20 +1,25 @@
 package com.indirgitsin.app.ui.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.indirgitsin.app.HomeViewModel
 import com.indirgitsin.app.data.history.HistoryDao
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
+import com.indirgitsin.app.ui.screen.DownloadsScreen
 import com.indirgitsin.app.ui.screen.HistoryScreen
 import com.indirgitsin.app.ui.screen.HomeScreen
 import com.indirgitsin.app.ui.screen.SettingsScreen
 import com.indirgitsin.app.ui.screen.VideoPlayerScreen
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -23,6 +28,10 @@ sealed class Screen(val route: String) {
     object History : Screen("history")
     object Downloads : Screen("downloads")
     object Settings : Screen("settings")
+    object Player : Screen("player/{uri}/{title}") {
+        fun createRoute(uri: String, title: String) = 
+            "player/${URLEncoder.encode(uri, StandardCharsets.UTF_8.toString())}/${URLEncoder.encode(title, StandardCharsets.UTF_8.toString())}"
+    }
 }
 
 @Composable
@@ -34,8 +43,6 @@ fun AppNavHost(
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val inputUrl by homeViewModel.inputUrl.collectAsState()
-    // Context'i composable scope'ta BİR KEZ alıp lambda'lara capture et
-    // (LocalContext.current çağrısı non-@Composable lambda içinde yapılamaz)
     val context = LocalContext.current
 
     NavHost(navController = navController, startDestination = Screen.Home.route) {
@@ -46,7 +53,7 @@ fun AppNavHost(
                 uiState = uiState,
                 onFetch = { url -> homeViewModel.fetch(url, context) },
                 onDownload = onDownload,
-                onPaste = { /* handled in MainActivity */ },
+                onPaste = {},
                 historyDao = historyDao,
                 onHistoryClick = { url ->
                     homeViewModel.onInputChange(url)
@@ -70,7 +77,7 @@ fun AppNavHost(
             )
         }
         composable(Screen.Downloads.route) {
-            com.indirgitsin.app.ui.screen.DownloadsScreen()
+            DownloadsScreen(navController)
         }
         composable(Screen.Settings.route) {
             SettingsScreen()
@@ -78,13 +85,13 @@ fun AppNavHost(
         composable(
             route = Screen.Player.route,
             arguments = listOf(
-                androidx.navigation.navArgument("uri") { type = androidx.navigation.NavType.StringType },
-                androidx.navigation.navArgument("title") { type = androidx.navigation.NavType.StringType }
+                navArgument("uri") { type = NavType.StringType },
+                navArgument("title") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val uri = backStackEntry.arguments?.getString("uri") ?: ""
-            val title = backStackEntry.arguments?.getString("title") ?: "Oynatıcı"
-            VideoPlayerScreen(videoUri = Uri.parse(java.net.URLDecoder.decode(uri, "UTF-8")))
+            val encodedUri = backStackEntry.arguments?.getString("uri") ?: ""
+            val uri = URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString())
+            VideoPlayerScreen(videoUri = Uri.parse(uri))
         }
     }
 }
