@@ -393,21 +393,52 @@ object FileDownloader {
             val vMime = vFormat.getString(MediaFormat.KEY_MIME) ?: MimeTypes.VIDEO_H264
             val aMime = aFormat.getString(MediaFormat.KEY_MIME) ?: MimeTypes.AUDIO_AAC
 
-            val vWidth = if (vFormat.containsKey(MediaFormat.KEY_WIDTH)) vFormat.getInteger(MediaFormat.KEY_WIDTH) else 1920
-            val vHeight = if (vFormat.containsKey(MediaFormat.KEY_HEIGHT)) vFormat.getInteger(MediaFormat.KEY_HEIGHT) else 1080
-            val aSampleRate = if (aFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) aFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
-            val aChannelCount = if (aFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) aFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
+            val vInitData = mutableListOf<ByteArray>()
+            for (key in listOf("csd-0", "csd-1", "csd-2")) {
+                if (vFormat.containsKey(key)) {
+                    val buf = vFormat.getByteBuffer(key)
+                    if (buf != null) {
+                        val bytes = ByteArray(buf.remaining())
+                        buf.get(bytes)
+                        buf.rewind()
+                        vInitData.add(bytes)
+                    }
+                }
+            }
+
+            val aInitData = mutableListOf<ByteArray>()
+            for (key in listOf("csd-0", "csd-1")) {
+                if (aFormat.containsKey(key)) {
+                    val buf = aFormat.getByteBuffer(key)
+                    if (buf != null) {
+                        val bytes = ByteArray(buf.remaining())
+                        buf.get(bytes)
+                        buf.rewind()
+                        aInitData.add(bytes)
+                    }
+                }
+            }
 
             val vMedia3Format = Format.Builder()
                 .setSampleMimeType(vMime)
                 .setWidth(vWidth)
                 .setHeight(vHeight)
+                .apply {
+                    if (vInitData.isNotEmpty()) {
+                        setInitializationData(vInitData)
+                    }
+                }
                 .build()
 
             val aMedia3Format = Format.Builder()
                 .setSampleMimeType(aMime)
                 .setSampleRate(aSampleRate)
                 .setChannelCount(aChannelCount)
+                .apply {
+                    if (aInitData.isNotEmpty()) {
+                        setInitializationData(aInitData)
+                    }
+                }
                 .build()
 
             fos = FileOutputStream(outFile)
