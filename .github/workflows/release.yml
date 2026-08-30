@@ -50,7 +50,6 @@ jobs:
             cipher/library/build/reports/
 
   device-test:
-    needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -66,6 +65,11 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+      - name: Reserve disk space for emulator userdata
+        # Only on this disposable GitHub Linux runner; Android does not use the .NET SDK.
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          df -h /
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -76,7 +80,7 @@ jobs:
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
-          # The API 29 image otherwise requests >7 GB of userdata on hosted runners.
+          # API 29 enforces a larger image minimum, so disk space is also reserved above.
           disk-size: 2048M
           emulator-boot-timeout: 300
           disable-animations: true
