@@ -99,8 +99,12 @@ object FileDownloader {
                 setMimeType(if (isAudioOnly) "audio/*" else "video/*")
                 setAllowedOverMetered(true)
                 setAllowedOverRoaming(true)
+                addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 13)")
+                addRequestHeader("Referer", "https://www.youtube.com/")
+                addRequestHeader("Accept", "*/*")
             }
             dm.enqueue(request)
+            Toast.makeText(context, "İndiriliyor: $fileName", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(context, "Hata: ${e.message}", Toast.LENGTH_LONG).show()
@@ -111,9 +115,12 @@ object FileDownloader {
         var result = Normalizer.normalize(title, Normalizer.Form.NFD)
             .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
             .replace(Regex("[\\\\/:*?\"<>|]"), "_")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-        return if (result.length > 80) result.take(80).trim() else result
+            .replace(Regex("\\s+"), "_")
+            .replace(Regex("[^a-zA-Z0-9._-]"), "_")
+            .replace(Regex("_+"), "_")
+            .trim('_')
+        if (result.isBlank()) result = "video"
+        return if (result.length > 60) result.take(60).trim('_') else result
     }
 
     private fun downloadAndMux(context: Context, videoUrl: String, audioUrl: String, subfolder: String, fileName: String): Boolean = downloadAndMuxWithReason(context, videoUrl, audioUrl, subfolder, fileName).first
