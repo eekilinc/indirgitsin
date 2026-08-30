@@ -153,18 +153,32 @@ object FileDownloader {
     }
 
     private fun downloadToFile(url: String, dest: File): Boolean {
-        return try {
-            val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return false
-                val body = resp.body ?: return false
-                dest.outputStream().use { out -> body.byteStream().copyTo(out) }
-                true
+        // YouTube n throttling için Range header ve referer ekle, 1 retry
+        repeat(2) { attempt ->
+            try {
+                val req = Request.Builder().url(url)
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 13)")
+                    .header("Accept", "*/*")
+                    .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
+                    .header("Referer", "https://www.youtube.com/")
+                    .header("Range", "bytes=0-")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) {
+                        // 403 throttled -> fail fast, fallback'a bırak
+                        if (resp.code == 403 && attempt == 0) return@repeat
+                        return false
+                    }
+                    val body = resp.body ?: return false
+                    dest.outputStream().use { out -> body.byteStream().copyTo(out) }
+                    if (dest.length() > 1024) return true else dest.delete()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                if (attempt == 1) return false
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
         }
+        return false
     }
 
     private fun muxFiles(videoFile: File, audioFile: File, outFile: File): Boolean {

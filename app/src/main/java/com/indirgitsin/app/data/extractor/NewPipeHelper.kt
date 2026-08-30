@@ -78,17 +78,19 @@ object NewPipeHelper {
                 }
             }
             if (streams.isEmpty()) return@withContext null
-            // video-only (parantezli) için en iyi sesle mux sentezle
+            // sadece mp4 video-only -> m4a/mp3 ile mux (webm MediaMuxer'da MP4'e muxlanamaz)
             run {
-                val bestAudio = streams.filter { it.isAudioOnly }.maxByOrNull { it.bitrate } ?: streams.filter { it.isAudioOnly }.firstOrNull()
+                val bestAudio = streams.filter { it.isAudioOnly && (it.extension == "m4a" || it.extension == "mp3") }.maxByOrNull { it.bitrate }
+                    ?: streams.filter { it.isAudioOnly && it.extension == "m4a" }.firstOrNull()
+                    ?: streams.filter { it.isAudioOnly }.firstOrNull()
                 if (bestAudio != null) {
-                    val videoOnly = streams.filter { it.isVideo && it.label.contains("(") && it.audioUrl == null }.toList()
+                    val videoOnly = streams.filter { it.isVideo && it.extension == "mp4" && it.label.contains("(") && it.audioUrl == null }.toList()
                     for (v in videoOnly) {
                         val q = v.quality.ifBlank { Regex("""(\d+p)""").find(v.label)?.value ?: v.label }
                         if (streams.any { it.quality == q && it.isVideo && !it.label.contains("(") && it.audioUrl == null }) continue
                         if (streams.any { it.quality == q && it.audioUrl == bestAudio.url && it.url == v.url }) continue
-                        val cleanLabel = "$q \u2022 ${v.extension.uppercase()}"
-                        streams.add(StreamOption(label = cleanLabel, extension = v.extension, quality = q, url = v.url, isVideo = true, isAudioOnly = false, bitrate = v.bitrate, audioUrl = bestAudio.url))
+                        val cleanLabel = "$q \u2022 MP4"
+                        streams.add(StreamOption(label = cleanLabel, extension = "mp4", quality = q, url = v.url, isVideo = true, isAudioOnly = false, bitrate = v.bitrate, audioUrl = bestAudio.url))
                     }
                 }
             }
