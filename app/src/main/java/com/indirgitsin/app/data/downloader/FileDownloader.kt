@@ -412,8 +412,8 @@ object FileDownloader {
 
             fos = FileOutputStream(outFile)
             mp4Muxer = Mp4Muxer.Builder(fos).build()
-            val vTrackToken = mp4Muxer.addTrack(vMedia3Format)
-            val aTrackToken = mp4Muxer.addTrack(aMedia3Format)
+            val vTrackToken = mp4Muxer.addTrack(0, vMedia3Format)
+            val aTrackToken = mp4Muxer.addTrack(1, aMedia3Format)
 
             val buffer = ByteBuffer.allocateDirect(1024 * 1024)
             val bufferInfo = MediaCodec.BufferInfo()
