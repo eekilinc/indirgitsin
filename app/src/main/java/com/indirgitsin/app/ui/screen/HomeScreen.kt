@@ -40,6 +40,12 @@ import com.indirgitsin.app.ui.theme.YtRed
 import com.indirgitsin.app.util.YoutubeLinkHelper
 import kotlinx.coroutines.launch
 
+private fun safeFormat(format: String, vararg args: Any): String = try {
+    String.format(format, *args)
+} catch (_: Exception) {
+    format
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -761,11 +767,7 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    when {
-                        downloading -> try { String.format(t("downloading_progress"), addedCount, selected.size) } catch (_: Exception) { t("downloading_progress") }
-                        addedCount > 0 -> try { String.format(t("added_count"), addedCount) } catch (_: Exception) { t("added_count") }
-                        else -> try { String.format(t("download_selected"), selected.size) } catch (_: Exception) { t("download_selected") }
-                    },
+                    when { downloading -> safeFormat(t("downloading_progress"), addedCount, selected.size) addedCount > 0 -> safeFormat(t("added_count"), addedCount) else -> safeFormat(t("download_selected"), selected.size) },
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -824,6 +826,7 @@ private fun YtPreview() {
         )
     }
 }
+
 
 
 
