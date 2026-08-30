@@ -590,11 +590,9 @@ private fun YtDownloadSheet(
                 SegmentedButton(selected = selectedTab == 1, onClick = { onTabChange(1) }, shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp), icon = { Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(16.dp)) }) { Text(t("audio")) }
             }
 // Chip filtreleri: 0 Tümü (tab'a göre), 1 Video, 2 Music, 3 Shorts, 4 4K
-            // Video tab: show muxed (video+audio) streams first, not video-only
-            val muxedStreams = video.streams.filter { it.isVideo && !it.label.contains("(video-only)", true) }
-            val videoOnlyStreams = video.streams.filter { it.isVideo && it.label.contains("(video-only)", true) }
+            // Video tab: sesli mux'lar (parantezsiz) + sentezlenmiş mux'lar; video-only'ler gizli (artık otomatik birleştiriliyor)
+            val muxedStreams = video.streams.filter { it.isVideo && !it.label.contains("(") }
             val audioOnlyStreams = video.streams.filter { it.isAudioOnly }
-            
             val baseByTab = if (selectedTab == 0) muxedStreams else audioOnlyStreams
             val (filtered, chipNote) = when (filterChip) {
                 1 -> baseByTab.filter { it.isVideo } to null

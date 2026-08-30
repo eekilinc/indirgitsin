@@ -11,6 +11,9 @@ import android.os.Build
 import android.os.Environment
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
@@ -18,10 +21,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
-import java.util.concurrent.TimeUnit
+import okhttp3.Request
+import java.io.File
+import java.nio.ByteBuffer
 import java.text.Normalizer
+import java.util.concurrent.TimeUnit
 
 object FileDownloader {
 
@@ -37,52 +44,172 @@ object FileDownloader {
         val qualityPart = option.quality.ifBlank { option.label.replace(" ", "_").take(20) }
         val fileName = "${safeTitle}_${qualityPart}.$ext"
 
-        // Register Receiver
+        // Mux gerektiren yüksek kalite video+ses birleştirme
+        if (option.audioUrl != null) {
+            CoroutineScope(Dispatchers.Main).launch {
+                Toast.makeText(context, "İndiriliyor (birleştiriliyor): $fileName", Toast.LENGTH_SHORT).show()
+                val subfolder = try { withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin" } catch (_: Exception) { "IndirGitsin" }
+                val success = withContext(Dispatchers.IO) { downloadAndMux(context, option.url, option.audioUrl!!, subfolder, fileName) }
+                if (success) {
+                    showNotification(context, fileName)
+                    Toast.makeText(context, "İndirme tamamlandı: $fileName", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Birleştirme başarısız, video ayrı indiriliyor", Toast.LENGTH_SHORT).show()
+                    enqueueSingle(context, option.url, subfolder, fileName, option.label, option.isAudioOnly)
+                }
+            }
+            return
+        }
+
+        // Normal tek dosya indirme (mux gerekmeyen / mux'lu 360p / ses)
+        CoroutineScope(Dispatchers.Main).launch {
+            val subfolder = try { withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin" } catch (_: Exception) { "IndirGitsin" }
+            enqueueSingleWithNotification(context, option.url, subfolder, fileName, option.label, option.isAudioOnly)
+        }
+    }
+
+    private fun enqueueSingleWithNotification(context: Context, url: String, subfolder: String, fileName: String, label: String, isAudioOnly: Boolean) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 showNotification(ctx, fileName)
                 ctx.unregisterReceiver(this)
             }
         }
-        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED)
         } else {
             context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
         }
+        enqueueSingle(context, url, subfolder, fileName, label, isAudioOnly)
+    }
 
-        CoroutineScope(Dispatchers.Main).launch {
-            val subfolder = try { withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin" } catch (_: Exception) { "IndirGitsin" }
-            val destFile = "$subfolder/$fileName"
-            try {
-                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                val request = DownloadManager.Request(android.net.Uri.parse(option.url)).apply {
-                    setTitle(fileName)
-                    setDescription("İndir Gitsin • ${option.label}")
-                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, destFile)
-                    setMimeType(if (option.isAudioOnly) "audio/*" else "video/*")
-                    setAllowedOverMetered(true)
-                    setAllowedOverRoaming(true)
-                }
-                dm.enqueue(request)
-                Toast.makeText(context, "İndiriliyor: $fileName", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(context, "Hata: ${e.message}", Toast.LENGTH_LONG).show()
+    private fun enqueueSingle(context: Context, url: String, subfolder: String, fileName: String, label: String, isAudioOnly: Boolean) {
+        try {
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val request = DownloadManager.Request(android.net.Uri.parse(url)).apply {
+                setTitle(fileName)
+                setDescription("İndir Gitsin \u2022 $label")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "$subfolder/$fileName")
+                setMimeType(if (isAudioOnly) "audio/*" else "video/*")
+                setAllowedOverMetered(true)
+                setAllowedOverRoaming(true)
             }
+            dm.enqueue(request)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "Hata: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun sanitizeFileName(title: String): String {
-        // Remove/replace Turkish characters and special chars for filesystem compatibility
         var result = Normalizer.normalize(title, Normalizer.Form.NFD)
-            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "") // Remove diacritics (ş->s, ğ->g, ı->i, ç->c, ö->o, ü->u)
-            .replace(Regex("[\\\\/:*?\"<>|]"), "_") // Replace filesystem forbidden chars
-            .replace(Regex("\\s+"), " ") // Normalize whitespace
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .replace(Regex("\\s+"), " ")
             .trim()
-        // Limit length, keep quality part space
         return if (result.length > 80) result.take(80).trim() else result
+    }
+
+    private fun downloadAndMux(context: Context, videoUrl: String, audioUrl: String, subfolder: String, fileName: String): Boolean {
+        var videoTmp: File? = null
+        var audioTmp: File? = null
+        var outFile: File? = null
+        return try {
+            val cache = context.cacheDir
+            videoTmp = File.createTempFile("vid_", ".tmp", cache)
+            audioTmp = File.createTempFile("aud_", ".tmp", cache)
+            if (!downloadToFile(videoUrl, videoTmp)) return false
+            if (!downloadToFile(audioUrl, audioTmp)) return false
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val outDir = File(downloadsDir, subfolder)
+            if (!outDir.exists()) outDir.mkdirs()
+            outFile = File(outDir, fileName)
+            // .tmp'a mux'la sonra atomik taşı
+            val muxTmp = File.createTempFile("mux_", ".tmp", cache)
+            val ok = muxFiles(videoTmp, audioTmp, muxTmp)
+            if (!ok) {
+                muxTmp.delete()
+                return false
+            }
+            // Downloads'a taşı
+            if (outFile.exists()) outFile.delete()
+            muxTmp.copyTo(outFile, overwrite = true)
+            muxTmp.delete()
+            // Medya taraması tetikle
+            try {
+                val scanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                scanIntent.data = android.net.Uri.fromFile(outFile)
+                context.sendBroadcast(scanIntent)
+            } catch (_: Exception) {}
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        } finally {
+            try { videoTmp?.delete() } catch (_: Exception) {}
+            try { audioTmp?.delete() } catch (_: Exception) {}
+        }
+    }
+
+    private fun downloadToFile(url: String, dest: File): Boolean {
+        return try {
+            val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return false
+                val body = resp.body ?: return false
+                dest.outputStream().use { out -> body.byteStream().copyTo(out) }
+                true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun muxFiles(videoFile: File, audioFile: File, outFile: File): Boolean {
+        var muxer: MediaMuxer? = null
+        var vExtractor: MediaExtractor? = null
+        var aExtractor: MediaExtractor? = null
+        return try {
+            vExtractor = MediaExtractor().apply { setDataSource(videoFile.absolutePath) }
+            aExtractor = MediaExtractor().apply { setDataSource(audioFile.absolutePath) }
+            val vTrackIdx = (0 until vExtractor.trackCount).firstOrNull { i -> vExtractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true } ?: 0
+            val aTrackIdx = (0 until aExtractor.trackCount).firstOrNull { i -> aExtractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true } ?: 0
+            vExtractor.selectTrack(vTrackIdx)
+            aExtractor.selectTrack(aTrackIdx)
+            val vFormat = vExtractor.getTrackFormat(vTrackIdx)
+            val aFormat = aExtractor.getTrackFormat(aTrackIdx)
+            muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val vMuxIdx = muxer.addTrack(vFormat)
+            val aMuxIdx = muxer.addTrack(aFormat)
+            muxer.start()
+            copyTrack(vExtractor, muxer, vMuxIdx)
+            copyTrack(aExtractor, muxer, aMuxIdx)
+            muxer.stop()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        } finally {
+            try { muxer?.release() } catch (_: Exception) {}
+            try { vExtractor?.release() } catch (_: Exception) {}
+            try { aExtractor?.release() } catch (_: Exception) {}
+        }
+    }
+
+    private fun copyTrack(extractor: MediaExtractor, muxer: MediaMuxer, muxIdx: Int) {
+        val buf = ByteBuffer.allocate(1024 * 512)
+        val info = android.media.MediaCodec.BufferInfo()
+        while (true) {
+            info.offset = 0
+            info.size = extractor.readSampleData(buf, 0)
+            if (info.size < 0) break
+            info.presentationTimeUs = extractor.sampleTime
+            info.flags = extractor.sampleFlags
+            muxer.writeSampleData(muxIdx, buf, info)
+            extractor.advance()
+        }
     }
 
     private fun showNotification(context: Context, fileName: String) {

@@ -78,7 +78,21 @@ object NewPipeHelper {
                 }
             }
             if (streams.isEmpty()) return@withContext null
-            val sorted = streams.distinctBy { it.url to it.extension }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) }.thenByDescending { it.bitrate })
+            // video-only (parantezli) için en iyi sesle mux sentezle
+            run {
+                val bestAudio = streams.filter { it.isAudioOnly }.maxByOrNull { it.bitrate } ?: streams.filter { it.isAudioOnly }.firstOrNull()
+                if (bestAudio != null) {
+                    val videoOnly = streams.filter { it.isVideo && it.label.contains("(") && it.audioUrl == null }.toList()
+                    for (v in videoOnly) {
+                        val q = v.quality.ifBlank { Regex("""(\d+p)""").find(v.label)?.value ?: v.label }
+                        if (streams.any { it.quality == q && it.isVideo && !it.label.contains("(") && it.audioUrl == null }) continue
+                        if (streams.any { it.quality == q && it.audioUrl == bestAudio.url && it.url == v.url }) continue
+                        val cleanLabel = "$q \u2022 ${v.extension.uppercase()}"
+                        streams.add(StreamOption(label = cleanLabel, extension = v.extension, quality = q, url = v.url, isVideo = true, isAudioOnly = false, bitrate = v.bitrate, audioUrl = bestAudio.url))
+                    }
+                }
+            }
+            val sorted = streams.distinctBy { it.url + (it.audioUrl ?: "") to it.extension }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) }.thenByDescending { it.bitrate })
             VideoInfo(videoId, title, author, thumb, duration, 0L, "https://www.youtube.com/watch?v=$videoId", sorted)
         } catch (e: Exception) {
             null

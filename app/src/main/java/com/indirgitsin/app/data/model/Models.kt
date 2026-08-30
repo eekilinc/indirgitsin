@@ -19,8 +19,11 @@ data class StreamOption(
     val isVideo: Boolean,
     val isAudioOnly: Boolean,
     val sizeApprox: String = "",
-    val bitrate: Int = 0
-)
+    val bitrate: Int = 0,
+    val audioUrl: String? = null // mux için: video-only + audio birleştirme
+) {
+    val needsMuxing: Boolean get() = audioUrl != null
+}
 
 data class PlaylistVideo(
     val id: String,

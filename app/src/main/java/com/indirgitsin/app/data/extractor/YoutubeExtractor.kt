@@ -281,8 +281,10 @@ object YoutubeExtractor {
 
             if (streams.isEmpty()) return null
 
+            synthesizeMuxedOptions(streams)
+
             // Deduplicate ve sırala - muxed önce, sonra ses bitrate
-            val sorted = streams.distinctBy { it.url }.sortedWith(
+            val sorted = streams.distinctBy { it.url + (it.audioUrl ?: "") }.sortedWith(
                 compareBy<StreamOption> { !it.isVideo }
                     .thenByDescending { extractQualityNumber(it.quality) }
                     .thenByDescending { it.bitrate }
@@ -392,7 +394,9 @@ object YoutubeExtractor {
 
         if (streams.isEmpty()) return null
 
-        val sorted = streams.distinctBy { it.url }.sortedWith(
+        synthesizeMuxedOptions(streams)
+
+        val sorted = streams.distinctBy { it.url + (it.audioUrl ?: "") }.sortedWith(
             compareBy<StreamOption> { !it.isVideo }
                 .thenByDescending { extractQualityNumber(it.quality) }
                 .thenByDescending { it.bitrate }
@@ -754,9 +758,26 @@ object YoutubeExtractor {
                 streams.add(StreamOption("HLS • M3U8", "m3u8", "auto", hls, true, false))
             }
             if (streams.isEmpty()) return null
-            val sorted = streams.distinctBy { it.url }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) })
+            synthesizeMuxedOptions(streams)
+            val sorted = streams.distinctBy { it.url + (it.audioUrl ?: "") }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) })
             VideoInfo(videoId, title, author, thumb, duration, views, "https://www.youtube.com/watch?v=$videoId", sorted)
         } catch (_: Exception) { null }
+    }
+
+    private fun synthesizeMuxedOptions(streams: MutableList<StreamOption>) {
+        if (streams.isEmpty()) return
+        val bestAudio = streams.filter { it.isAudioOnly }.maxByOrNull { it.bitrate } ?: streams.filter { it.isAudioOnly }.firstOrNull() ?: return
+        // gerçek mux'lar parantez içermez ("360p • MP4"), video-only'ler içerir ("720p • MP4 (video-only)" / "(sadece video)")
+        val videoOnly = streams.filter { it.isVideo && it.label.contains("(") && it.audioUrl == null }.toList()
+        for (v in videoOnly) {
+            val q = v.quality.ifBlank { Regex("""(\d+p)""").find(v.label)?.value ?: v.label }
+            // zaten sesli mux varsa atla (parantezsiz aynı kalite)
+            if (streams.any { it.quality == q && it.isVideo && !it.label.contains("(") && it.audioUrl == null }) continue
+            // zaten sentezlenmiş aynı kalite+url varsa atla
+            if (streams.any { it.quality == q && it.audioUrl == bestAudio.url && it.url == v.url }) continue
+            val cleanLabel = "$q \u2022 ${v.extension.uppercase()}"
+            streams.add(StreamOption(label = cleanLabel, extension = v.extension, quality = q, url = v.url, isVideo = true, isAudioOnly = false, bitrate = v.bitrate, audioUrl = bestAudio.url))
+        }
     }
 
     private fun extractQualityNumber(q: String): Int {
