@@ -16,9 +16,9 @@ import android.os.Build
 import android.os.Environment
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import com.googlecode.mp4parser.authoring.Movie
-import com.googlecode.mp4parser.authoring.builder.DefaultMp4Builder
-import com.googlecode.mp4parser.authoring.container.mp4.MovieCreator
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
+import androidx.media3.muxer.Mp4Muxer
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
@@ -329,61 +329,173 @@ object FileDownloader {
     }
 
     /**
-     * Çift Motorlu Muxer: Önce Pure Java Mp4Parser dener, gerekirse MediaMuxer'a geçer.
+     * Çift Motorlu Muxer: Media3 Mp4Muxer (Resmi Android Jetpack) + Android MediaMuxer yedek.
      */
     private fun muxVideoAndAudio(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
-        // 1. Motor: Mp4Parser (Pure Java ISO Container - Fragmented MP4 ve tüm codec'lerle %100 uyumlu)
-        val mp4ParserRes = muxWithMp4Parser(videoFile, audioFile, outFile)
-        if (mp4ParserRes.first) {
+        // 1. Motor: Media3 Mp4Muxer (Official Google Jetpack - Fragmented MP4 ve DASH ile %100 uyumlu)
+        val media3Res = muxWithMedia3Muxer(videoFile, audioFile, outFile)
+        if (media3Res.first && outFile.exists() && outFile.length() > 1024) {
             return true to null
         }
 
-        // 2. Motor: MediaMuxer (Yedek)
-        val mediaMuxerRes = muxWithMediaMuxer(videoFile, audioFile, outFile)
-        if (mediaMuxerRes.first) {
+        // 2. Motor: Android MediaMuxer (Yedek)
+        val nativeMuxerRes = muxWithMediaMuxer(videoFile, audioFile, outFile)
+        if (nativeMuxerRes.first && outFile.exists() && outFile.length() > 1024) {
             return true to null
         }
 
-        return false to "Birleştirme başarısız (Mp4Parser: ${mp4ParserRes.second}, MediaMuxer: ${mediaMuxerRes.second})"
+        return false to "Birleştirme başarısız (Media3: ${media3Res.second}, Yerel: ${nativeMuxerRes.second})"
     }
 
     /**
-     * Mp4Parser ile Saf Java Seviyesinde MP4 Birleştirme (Donanım/Chipset bağımlılığı yoktur, fMP4 destekler)
+     * Android Media3 Mp4Muxer (Jetpack Resmi Saf Java/Kotlin MP4 Muxer)
      */
-    private fun muxWithMp4Parser(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
+    private fun muxWithMedia3Muxer(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
+        var vExtractor: MediaExtractor? = null
+        var aExtractor: MediaExtractor? = null
+        var mp4Muxer: Mp4Muxer? = null
+        var fos: FileOutputStream? = null
+
         return try {
-            val videoMovie = MovieCreator.build(videoFile.absolutePath)
-            val audioMovie = MovieCreator.build(audioFile.absolutePath)
-            val finalMovie = Movie()
+            vExtractor = MediaExtractor().apply { setDataSource(videoFile.absolutePath) }
+            aExtractor = MediaExtractor().apply { setDataSource(audioFile.absolutePath) }
 
-            for (track in videoMovie.tracks) {
-                if (track.handler == "vide") {
-                    finalMovie.addTrack(track)
+            var vTrackIdx = -1
+            var aTrackIdx = -1
+
+            for (i in 0 until vExtractor.trackCount) {
+                val format = vExtractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                if (mime.startsWith("video/")) {
+                    vTrackIdx = i
+                    break
                 }
             }
-            for (track in audioMovie.tracks) {
-                if (track.handler == "soun") {
-                    finalMovie.addTrack(track)
+
+            for (i in 0 until aExtractor.trackCount) {
+                val format = aExtractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                if (mime.startsWith("audio/")) {
+                    aTrackIdx = i
+                    break
                 }
             }
 
-            if (finalMovie.tracks.isEmpty()) {
-                return false to "MP4 video/ses izleri bulunamadı"
+            if (vTrackIdx == -1) return false to "Video izi bulunamadı"
+            if (aTrackIdx == -1) return false to "Ses izi bulunamadı"
+
+            val vFormat = vExtractor.getTrackFormat(vTrackIdx)
+            val aFormat = aExtractor.getTrackFormat(aTrackIdx)
+
+            vExtractor.selectTrack(vTrackIdx)
+            aExtractor.selectTrack(aTrackIdx)
+
+            val vMime = vFormat.getString(MediaFormat.KEY_MIME) ?: MimeTypes.VIDEO_H264
+            val aMime = aFormat.getString(MediaFormat.KEY_MIME) ?: MimeTypes.AUDIO_AAC
+
+            val vWidth = if (vFormat.containsKey(MediaFormat.KEY_WIDTH)) vFormat.getInteger(MediaFormat.KEY_WIDTH) else 1920
+            val vHeight = if (vFormat.containsKey(MediaFormat.KEY_HEIGHT)) vFormat.getInteger(MediaFormat.KEY_HEIGHT) else 1080
+            val aSampleRate = if (aFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) aFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
+            val aChannelCount = if (aFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) aFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
+
+            val vMedia3Format = Format.Builder()
+                .setSampleMimeType(vMime)
+                .setWidth(vWidth)
+                .setHeight(vHeight)
+                .build()
+
+            val aMedia3Format = Format.Builder()
+                .setSampleMimeType(aMime)
+                .setSampleRate(aSampleRate)
+                .setChannelCount(aChannelCount)
+                .build()
+
+            fos = FileOutputStream(outFile)
+            mp4Muxer = Mp4Muxer.Builder(fos).build()
+            val vTrackToken = mp4Muxer.addTrack(vMedia3Format)
+            val aTrackToken = mp4Muxer.addTrack(aMedia3Format)
+
+            val buffer = ByteBuffer.allocateDirect(1024 * 1024)
+            val bufferInfo = MediaCodec.BufferInfo()
+
+            var lastVTime = -1L
+            var lastATime = -1L
+            var vStartOffset = -1L
+            var aStartOffset = -1L
+
+            var videoDone = false
+            var audioDone = false
+
+            while (!videoDone || !audioDone) {
+                val vRawTime = if (!videoDone) vExtractor.sampleTime else Long.MAX_VALUE
+                val aRawTime = if (!audioDone) aExtractor.sampleTime else Long.MAX_VALUE
+
+                if (vRawTime < 0) videoDone = true
+                if (aRawTime < 0) audioDone = true
+
+                if (videoDone && audioDone) break
+
+                if (!videoDone && (audioDone || vRawTime <= aRawTime)) {
+                    buffer.clear()
+                    val sampleSize = vExtractor.readSampleData(buffer, 0)
+                    if (sampleSize < 0) {
+                        videoDone = true
+                    } else {
+                        if (vStartOffset < 0) vStartOffset = vRawTime
+                        var pts = vRawTime - vStartOffset
+                        if (pts <= lastVTime) pts = lastVTime + 1000L
+                        lastVTime = pts
+
+                        bufferInfo.offset = 0
+                        bufferInfo.size = sampleSize
+                        bufferInfo.presentationTimeUs = pts
+                        bufferInfo.flags = if ((vExtractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) {
+                            MediaCodec.BUFFER_FLAG_KEY_FRAME
+                        } else 0
+
+                        buffer.position(0)
+                        buffer.limit(sampleSize)
+
+                        mp4Muxer.writeSampleData(vTrackToken, buffer, bufferInfo)
+                        vExtractor.advance()
+                    }
+                } else if (!audioDone) {
+                    buffer.clear()
+                    val sampleSize = aExtractor.readSampleData(buffer, 0)
+                    if (sampleSize < 0) {
+                        audioDone = true
+                    } else {
+                        if (aStartOffset < 0) aStartOffset = aRawTime
+                        var pts = aRawTime - aStartOffset
+                        if (pts <= lastATime) pts = lastATime + 1000L
+                        lastATime = pts
+
+                        bufferInfo.offset = 0
+                        bufferInfo.size = sampleSize
+                        bufferInfo.presentationTimeUs = pts
+                        bufferInfo.flags = if ((aExtractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) {
+                            MediaCodec.BUFFER_FLAG_KEY_FRAME
+                        } else 0
+
+                        buffer.position(0)
+                        buffer.limit(sampleSize)
+
+                        mp4Muxer.writeSampleData(aTrackToken, buffer, bufferInfo)
+                        aExtractor.advance()
+                    }
+                }
             }
 
-            val container = DefaultMp4Builder().build(finalMovie)
-            FileOutputStream(outFile).use { fos ->
-                container.writeContainer(fos.channel)
-            }
-
-            if (outFile.exists() && outFile.length() > 1024) {
-                true to null
-            } else {
-                false to "Çıktı dosyası boş veya geçersiz"
-            }
+            mp4Muxer.close()
+            true to null
         } catch (e: Exception) {
             e.printStackTrace()
-            false to (e.message ?: "Mp4Parser istisnası")
+            false to (e.message ?: "Media3 Mp4Muxer hatası")
+        } finally {
+            try { mp4Muxer?.close() } catch (_: Exception) {}
+            try { fos?.close() } catch (_: Exception) {}
+            try { vExtractor?.release() } catch (_: Exception) {}
+            try { aExtractor?.release() } catch (_: Exception) {}
         }
     }
 

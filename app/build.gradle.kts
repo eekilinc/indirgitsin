@@ -86,13 +86,13 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // ExoPlayer
+    // ExoPlayer & Media3 Muxer / Transformer
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-ui:1.3.1")
     implementation("androidx.media3:media3-common:1.3.1")
-
-    // MP4 Muxer (Pure Java container muxing - Fragmented MP4 ve tüm codec'lerle %100 uyumlu)
-    implementation("com.googlecode.mp4parser:isoparser:1.9.41")
+    implementation("androidx.media3:media3-muxer:1.3.1")
+    implementation("androidx.media3:media3-transformer:1.3.1")
+    implementation("androidx.media3:media3-extractor:1.3.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
