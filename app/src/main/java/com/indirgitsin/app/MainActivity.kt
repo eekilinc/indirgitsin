@@ -1,14 +1,19 @@
 package com.indirgitsin.app
 
+import android.Manifest
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -42,8 +47,17 @@ class MainActivity : ComponentActivity() {
         BottomItem(Screen.Settings.route, "Ayarlar", Icons.Rounded.Settings, Icons.Rounded.Settings)
     )
 
+    private val requestNotifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Android 13+ bildirim izni - DownloadCompleteReceiver için
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
         val db = AppDatabase.get(this)
         vm.historyDao = db.historyDao()
@@ -54,8 +68,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
             val themePref by SettingsStore.themeFlow(context).collectAsState(initial = "dark")
+            val appColor by SettingsStore.appColorFlow(context).collectAsState(initial = "red")
+            val lang by SettingsStore.languageFlow(context).collectAsState(initial = "tr")
             val isDark = when (themePref) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
-            IndirGitsinTheme(darkTheme = isDark) {
+            androidx.compose.runtime.CompositionLocalProvider(com.indirgitsin.app.data.lang.LocalAppLanguage provides lang) {
+            IndirGitsinTheme(darkTheme = isDark, appColor = appColor) {
                 val navController = rememberNavController()
                 val backStack by navController.currentBackStackEntryAsState()
                 val currentRoute = backStack?.destination?.route
@@ -150,7 +167,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-            }
+            } // CompositionLocalProvider
+            } // IndirGitsinTheme
         }
     }
 

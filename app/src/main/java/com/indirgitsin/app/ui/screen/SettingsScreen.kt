@@ -14,6 +14,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -35,10 +38,51 @@ fun SettingsScreen() {
     var checking by remember { mutableStateOf(false) }
     var manualUpdate by remember { mutableStateOf<com.indirgitsin.app.util.UpdateChecker.UpdateInfo?>(null) }
     val theme by SettingsStore.themeFlow(context).collectAsState(initial = "dark")
+    val appColor by SettingsStore.appColorFlow(context).collectAsState(initial = "red")
+    val language by SettingsStore.languageFlow(context).collectAsState(initial = "tr")
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Ayarlar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
-        Text("Premium deneyim • YouTube & Spotify tarzı", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (language=="en") "Settings" else "Ayarlar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+        Text(if (language=="en") "Premium experience • YouTube & Spotify style" else "Premium deneyim • YouTube & Spotify tarzı", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        // Dil seçimi - modüler
+        PremiumSettingCard(
+            icon = Icons.Rounded.Language,
+            title = if (language=="en") "Language" else "Dil",
+            subtitle = if (language=="en") "App language" else "Uygulama dili",
+            action = {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.indirgitsin.app.data.lang.AppStrings.supported.forEach { (code, label) ->
+                        val sel = language==code
+                        FilterChip(selected = sel, onClick = { scope.launch { SettingsStore.setLanguage(context, code) } }, label = { Text(label, style = MaterialTheme.typography.labelSmall) }, shape = RoundedCornerShape(8.dp))
+                    }
+                }
+            }
+        )
+
+        // Renk seçimi
+        PremiumSettingCard(
+            icon = Icons.Rounded.Palette,
+            title = if (language=="en") "Color" else "Renk",
+            subtitle = if (language=="en") "Interface accent" else "Arayüz vurgu rengi",
+            action = {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.indirgitsin.app.ui.theme.AppColor.entries.forEach { ac ->
+                        val sel = appColor==ac.key
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(14.dp))
+                                .then(if (sel) Modifier else Modifier)
+                                .background(ac.primary)
+                                .clickable { scope.launch { SettingsStore.setAppColor(context, ac.key) } }
+                                .let { m -> if (sel) m.then(Modifier.padding(2.dp)) else m },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (sel) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        )
 
         // Tema secimi - acik/koyu/sistem
         PremiumSettingCard(

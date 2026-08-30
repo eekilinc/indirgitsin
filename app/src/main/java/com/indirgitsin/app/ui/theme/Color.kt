@@ -17,6 +17,16 @@ val YtBorder = Color(0xFF303030)
 val YtChipSelected = Color(0xFFF1F1F1)
 val YtChipUnselected = Color(0xFF272727)
 
+// Renk seçenekleri için palet
+enum class AppColor(val key: String, val primary: Color, val primaryDark: Color, val label: String) {
+    RED("red", Color(0xFFFF0000), Color(0xFFCC0000), "Kırmızı"),
+    BLUE("blue", Color(0xFF1565C0), Color(0xFF0D47A1), "Mavi"),
+    GREEN("green", Color(0xFF2E7D32), Color(0xFF1B5E20), "Yeşil"),
+    PURPLE("purple", Color(0xFF6A1B9A), Color(0xFF4A148C), "Mor"),
+    ORANGE("orange", Color(0xFFEF6C00), Color(0xFFE65100), "Turuncu");
+    companion object { fun fromKey(k: String) = entries.find { it.key == k } ?: RED }
+}
+
 // Premium için korunanlar
 val PremiumGold = Color(0xFFFFD60A)
 

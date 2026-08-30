@@ -6,10 +6,10 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val YtDarkColors = darkColorScheme(
-    primary = YtRed,
+private fun ytDarkColors(primary: Color, primaryDark: Color) = darkColorScheme(
+    primary = primary,
     onPrimary = Color.White,
-    primaryContainer = YtRedDark,
+    primaryContainer = primaryDark,
     background = YtBackground,
     onBackground = YtTextPrimary,
     surface = YtBackground,
@@ -26,8 +26,8 @@ private val YtDarkColors = darkColorScheme(
     scrim = Color.Black
 )
 
-private val YtLightColors = lightColorScheme(
-    primary = YtRed,
+private fun ytLightColors(primary: Color) = lightColorScheme(
+    primary = primary,
     onPrimary = Color.White,
     background = Color(0xFFF9F9F9),
     onBackground = Color(0xFF0F0F0F),
@@ -42,9 +42,11 @@ private val YtLightColors = lightColorScheme(
 @Composable
 fun IndirGitsinTheme(
     darkTheme: Boolean = true,
+    appColor: String = "red",
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) YtDarkColors else YtLightColors
+    val c = AppColor.fromKey(appColor)
+    val colors = if (darkTheme) ytDarkColors(c.primary, c.primaryDark) else ytLightColors(c.primary)
     MaterialTheme(
         colorScheme = colors,
         typography = Typography,

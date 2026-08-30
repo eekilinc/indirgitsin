@@ -16,6 +16,8 @@ object SettingsStore {
     private val KEY_AUDIO_FORMAT = stringPreferencesKey("audio_format")
     private val KEY_DOWNLOAD_SUBFOLDER = stringPreferencesKey("download_subfolder")
     private val KEY_THEME = stringPreferencesKey("theme")
+    private val KEY_APP_COLOR = stringPreferencesKey("app_color")
+    private val KEY_LANGUAGE = stringPreferencesKey("app_language")
 
     fun autoHighFlow(context: Context): Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AUTO_HIGH] ?: true }
     suspend fun setAutoHigh(context: Context, value: Boolean) { context.settingsDataStore.edit { it[KEY_AUTO_HIGH] = value } }
@@ -29,4 +31,10 @@ object SettingsStore {
 
     fun themeFlow(context: Context): Flow<String> = context.settingsDataStore.data.map { it[KEY_THEME] ?: "dark" }
     suspend fun setTheme(context: Context, value: String) { context.settingsDataStore.edit { it[KEY_THEME] = value } }
+
+    fun appColorFlow(context: Context): Flow<String> = context.settingsDataStore.data.map { it[KEY_APP_COLOR] ?: "red" }
+    suspend fun setAppColor(context: Context, value: String) { context.settingsDataStore.edit { it[KEY_APP_COLOR] = value } }
+
+    fun languageFlow(context: Context): Flow<String> = context.settingsDataStore.data.map { it[KEY_LANGUAGE] ?: "tr" }
+    suspend fun setLanguage(context: Context, value: String) { context.settingsDataStore.edit { it[KEY_LANGUAGE] = value } }
 }
