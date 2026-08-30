@@ -195,7 +195,7 @@ private fun YtTopBar() {
                 Text(t("app_name"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(6.dp))
                 Surface(shape = RoundedCornerShape(4.dp), color = YtRed) {
-                    Text("  ${t("premium")}  ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                    Text("  " + t("premium") + "  ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                 }
             }
             Spacer(Modifier.weight(1f))
@@ -222,7 +222,7 @@ private fun YtPremiumHero() {
                 Text(t("premium_desc"), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
             }
             Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
-                Text(" ${t("pro")} ", color = YtRed, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                Text(" " + t("pro") + " ", color = YtRed, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
             }
         }
     }
@@ -825,6 +825,7 @@ private fun YtPreview() {
         )
     }
 }
+
 
 
 
