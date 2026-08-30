@@ -90,8 +90,10 @@ fun AppNavHost(
             )
         ) { backStackEntry ->
             val encodedUri = backStackEntry.arguments?.getString("uri") ?: ""
+            val encodedTitle = backStackEntry.arguments?.getString("title") ?: ""
             val uri = URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString())
-            VideoPlayerScreen(videoUri = Uri.parse(uri), navController = navController)
+            val title = URLDecoder.decode(encodedTitle, StandardCharsets.UTF_8.toString())
+            VideoPlayerScreen(videoUri = Uri.parse(uri), title = title, navController = navController)
         }
     }
 }

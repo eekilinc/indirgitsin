@@ -766,16 +766,14 @@ object YoutubeExtractor {
 
     private fun synthesizeMuxedOptions(streams: MutableList<StreamOption>) {
         if (streams.isEmpty()) return
-        // MP4 video -> M4A audio (MediaMuxer MP4 için uyumlu), WebM mux'u atla (MP4 muxer desteklemez)
         val bestAudioMp4 = streams.filter { it.isAudioOnly && (it.extension == "m4a" || it.extension == "mp3") }.maxByOrNull { it.bitrate }
             ?: streams.filter { it.isAudioOnly && it.extension == "m4a" }.firstOrNull()
-            ?: streams.filter { it.isAudioOnly }.firstOrNull() ?: return
-        // sadece mp4 video-only'leri sentezle (webm -> mux başarısız olur)
-        val videoOnly = streams.filter { it.isVideo && it.extension == "mp4" && it.label.contains("(") && it.audioUrl == null }.toList()
+            ?: streams.filter { it.isAudioOnly }.maxByOrNull { it.bitrate } ?: return
+
+        val videoOnly = streams.filter { it.isVideo && it.audioUrl == null }.toList()
         for (v in videoOnly) {
             val q = v.quality.ifBlank { Regex("""(\d+p)""").find(v.label)?.value ?: v.label }
-            if (streams.any { it.quality == q && it.isVideo && !it.label.contains("(") && it.audioUrl == null }) continue
-            if (streams.any { it.quality == q && it.audioUrl == bestAudioMp4.url && it.url == v.url }) continue
+            if (streams.any { it.quality == q && it.isVideo && it.audioUrl != null }) continue
             val cleanLabel = "$q \u2022 MP4"
             streams.add(StreamOption(label = cleanLabel, extension = "mp4", quality = q, url = v.url, isVideo = true, isAudioOnly = false, bitrate = v.bitrate, audioUrl = bestAudioMp4.url))
         }

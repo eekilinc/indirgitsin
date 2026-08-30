@@ -170,7 +170,26 @@ object AppStrings {
         "downloading_progress" to "Ekleniyor... (%s/%s)",
         "added_count" to "Eklendi (%s) • İndirilenler'e git",
         "download_selected" to "Seçilenleri İndir (%s)",
-        "queue_added_count" to "%s video kuyruğa eklendi • Bildirimden takip et"
+        "queue_added_count" to "%s video kuyruğa eklendi • Bildirimden takip et",
+        "playback_speed" to "Oynatma Hızı",
+        "fit_screen" to "Sığdır",
+        "fill_screen" to "Doldur",
+        "zoom_screen" to "Yakınlaştır",
+        "clear_history_confirm_title" to "Geçmişi Temizle",
+        "clear_history_confirm_body" to "Tüm izleme ve indirme geçmişi silinsin mi?",
+        "search_downloads" to "İndirilenlerde ara...",
+        "search_history" to "Geçmişte ara...",
+        "filter_all" to "Tümü",
+        "filter_videos" to "Videolar",
+        "filter_audios" to "Sesler",
+        "clear_cache" to "Önbelleği Temizle",
+        "cache_cleared" to "Önbellek temizlendi (%s)",
+        "cache_size" to "Önbellek Boyutu",
+        "total_storage" to "Kullanılan Alan",
+        "cancel" to "İptal",
+        "confirm" to "Onayla",
+        "play_internal" to "Uygulama İçi Oynat",
+        "open_with" to "Birlikte Aç"
     )
     private val en = mapOf(
         "app_name" to "Download Go",
@@ -336,7 +355,26 @@ object AppStrings {
         "downloading_progress" to "Adding... (%s/%s)",
         "added_count" to "Added (%s) • Go to Downloads",
         "download_selected" to "Download selected (%s)",
-        "queue_added_count" to "%s videos added to queue • Track from notification"
+        "queue_added_count" to "%s videos added to queue • Track from notification",
+        "playback_speed" to "Playback Speed",
+        "fit_screen" to "Fit",
+        "fill_screen" to "Fill",
+        "zoom_screen" to "Zoom",
+        "clear_history_confirm_title" to "Clear History",
+        "clear_history_confirm_body" to "Do you want to delete all watch and download history?",
+        "search_downloads" to "Search in downloads...",
+        "search_history" to "Search in history...",
+        "filter_all" to "All",
+        "filter_videos" to "Videos",
+        "filter_audios" to "Audio",
+        "clear_cache" to "Clear Cache",
+        "cache_cleared" to "Cache cleared (%s)",
+        "cache_size" to "Cache Size",
+        "total_storage" to "Storage Used",
+        "cancel" to "Cancel",
+        "confirm" to "Confirm",
+        "play_internal" to "Play in App",
+        "open_with" to "Open With"
     )
 
     private val maps = mapOf("tr" to tr, "en" to en)

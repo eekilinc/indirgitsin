@@ -7,13 +7,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import android.media.MediaExtractor
-import android.media.MediaFormat
-import android.media.MediaMuxer
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
@@ -26,6 +28,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.text.Normalizer
 import java.util.concurrent.TimeUnit
@@ -35,40 +39,53 @@ object FileDownloader {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     fun enqueue(context: Context, video: VideoInfo, option: StreamOption) {
-        // Better Turkish-compatible file name
         val safeTitle = sanitizeFileName(video.title)
         val ext = option.extension.ifBlank { if (option.isAudioOnly) "m4a" else "mp4" }
         val qualityPart = option.quality.ifBlank { option.label.replace(" ", "_").take(20) }
         val fileName = "${safeTitle}_${qualityPart}.$ext"
 
-        // Mux gerektiren yüksek kalite video+ses birleştirme
-        if (option.audioUrl != null) {
+        // Güvenlik Ağı: Eğer video ise ve ses akışı ayrık ise, audioUrl'i garantiye al
+        val effectiveAudioUrl = option.audioUrl ?: if (option.isVideo && option.quality != "360p") {
+            video.streams.filter { it.isAudioOnly && it.extension == "m4a" }.maxByOrNull { it.bitrate }?.url
+                ?: video.streams.filter { it.isAudioOnly }.maxByOrNull { it.bitrate }?.url
+        } else null
+
+        // Mux gerektiren (video + ses birleştirme) indirme
+        if (effectiveAudioUrl != null) {
             CoroutineScope(Dispatchers.Main).launch {
-                Toast.makeText(context, "İndiriliyor (birleştiriliyor): $fileName", Toast.LENGTH_SHORT).show()
-                val subfolder = try { withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin" } catch (_: Exception) { "IndirGitsin" }
-                val result = withContext(Dispatchers.IO) { downloadAndMuxWithReason(context, option.url, option.audioUrl!!, subfolder, fileName) }
+                Toast.makeText(context, "İndiriliyor (Ses ve Video Birleştiriliyor): $fileName", Toast.LENGTH_SHORT).show()
+                val subfolder = try {
+                    withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin"
+                } catch (_: Exception) { "IndirGitsin" }
+
+                val result = withContext(Dispatchers.IO) {
+                    downloadAndMuxWithReason(context, option.url, effectiveAudioUrl, subfolder, fileName)
+                }
+
                 if (result.first) {
                     showNotification(context, fileName)
-                    Toast.makeText(context, "İndirme tamamlandı: $fileName", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "İndirme ve birleştirme tamamlandı: $fileName", Toast.LENGTH_SHORT).show()
                 } else {
                     val reason = result.second ?: "bilinmeyen hata"
-                    Toast.makeText(context, "Birleştirme başarısız ($reason), ayrı indiriliyor", Toast.LENGTH_LONG).show()
-                    // Fallback: video ve sesi ayrı ayrı DownloadManager ile indir (en azından ikisi de olsun)
+                    Toast.makeText(context, "Birleştirme hatası: $reason. Ayrı olarak indiriliyor.", Toast.LENGTH_LONG).show()
                     val audioExt = "m4a"
                     val audioName = fileName.substringBeforeLast(".") + "_ses.$audioExt"
                     enqueueSingle(context, option.url, subfolder, fileName, option.label, false)
-                    enqueueSingle(context, option.audioUrl!!, subfolder, audioName, "Ses • $audioExt", true)
+                    enqueueSingle(context, effectiveAudioUrl, subfolder, audioName, "Ses • $audioExt", true)
                 }
             }
             return
         }
 
-        // Normal tek dosya indirme (mux gerekmeyen / mux'lu 360p / ses)
+        // Doğrudan tek dosya indirme (Ses dosyaları veya inherent muxed 360p)
         CoroutineScope(Dispatchers.Main).launch {
-            val subfolder = try { withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin" } catch (_: Exception) { "IndirGitsin" }
+            val subfolder = try {
+                withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin"
+            } catch (_: Exception) { "IndirGitsin" }
             enqueueSingleWithNotification(context, option.url, subfolder, fileName, option.label, option.isAudioOnly)
         }
     }
@@ -77,29 +94,31 @@ object FileDownloader {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 showNotification(ctx, fileName)
-                ctx.unregisterReceiver(this)
+                try { ctx.unregisterReceiver(this) } catch (_: Exception) {}
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
-        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            }
+        } catch (_: Exception) {}
         enqueueSingle(context, url, subfolder, fileName, label, isAudioOnly)
     }
 
     private fun enqueueSingle(context: Context, url: String, subfolder: String, fileName: String, label: String, isAudioOnly: Boolean) {
         try {
             val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            val request = DownloadManager.Request(android.net.Uri.parse(url)).apply {
+            val request = DownloadManager.Request(Uri.parse(url)).apply {
                 setTitle(fileName)
-                setDescription("İndir Gitsin \u2022 $label")
+                setDescription("İndir Gitsin • $label")
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "$subfolder/$fileName")
                 setMimeType(if (isAudioOnly) "audio/*" else "video/*")
                 setAllowedOverMetered(true)
                 setAllowedOverRoaming(true)
-                addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 13)")
+                addRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 addRequestHeader("Referer", "https://www.youtube.com/")
                 addRequestHeader("Accept", "*/*")
             }
@@ -123,128 +142,194 @@ object FileDownloader {
         return if (result.length > 60) result.take(60).trim('_') else result
     }
 
-    private fun downloadAndMux(context: Context, videoUrl: String, audioUrl: String, subfolder: String, fileName: String): Boolean = downloadAndMuxWithReason(context, videoUrl, audioUrl, subfolder, fileName).first
-
     private fun downloadAndMuxWithReason(context: Context, videoUrl: String, audioUrl: String, subfolder: String, fileName: String): Pair<Boolean, String?> {
         var videoTmp: File? = null
         var audioTmp: File? = null
+        var muxTmp: File? = null
         return try {
             val cache = context.cacheDir
             videoTmp = File.createTempFile("vid_", ".tmp", cache)
             audioTmp = File.createTempFile("aud_", ".tmp", cache)
-            if (!downloadToFile(videoUrl, videoTmp)) return false to "video indirilemedi (403/throttle)"
-            if (!downloadToFile(audioUrl, audioTmp)) return false to "ses indirilemedi"
-            if (videoTmp.length() < 1024 || audioTmp.length() < 1024) return false to "dosya çok küçük"
+
+            if (!downloadToFile(videoUrl, videoTmp)) {
+                return false to "Video akışı indirilemedi (Bağlantı/403)"
+            }
+            if (!downloadToFile(audioUrl, audioTmp)) {
+                return false to "Ses akışı indirilemedi (Bağlantı/403)"
+            }
+            if (videoTmp.length() < 1024 || audioTmp.length() < 1024) {
+                return false to "İndirilen dosyalar eksik veya boş"
+            }
+
             val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val outDir = File(downloadsDir, subfolder)
             if (!outDir.exists()) outDir.mkdirs()
             val outFile = File(outDir, fileName)
-            val muxTmp = File.createTempFile("mux_", ".tmp", cache)
-            val muxRes = muxFilesWithReason(videoTmp, audioTmp, muxTmp)
+
+            muxTmp = File.createTempFile("mux_", ".tmp", cache)
+            val muxRes = muxFilesInterleaved(videoTmp, audioTmp, muxTmp)
             if (!muxRes.first) {
                 muxTmp.delete()
-                return false to (muxRes.second ?: "mux başarısız")
+                return false to (muxRes.second ?: "Muxing başarısız")
             }
+
             if (outFile.exists()) outFile.delete()
             muxTmp.copyTo(outFile, overwrite = true)
             muxTmp.delete()
+
+            // Medya tarayıcısına bildir (Galeride ve oynatıcılarda hemen görünsün)
             try {
-                val scanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
-                scanIntent.data = android.net.Uri.fromFile(outFile)
+                val scanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).apply {
+                    data = Uri.fromFile(outFile)
+                }
                 context.sendBroadcast(scanIntent)
             } catch (_: Exception) {}
+
             true to null
         } catch (e: Exception) {
             e.printStackTrace()
-            false to (e.message ?: "exception")
+            false to (e.message ?: "İşlem sırasında hata oluştu")
         } finally {
             try { videoTmp?.delete() } catch (_: Exception) {}
             try { audioTmp?.delete() } catch (_: Exception) {}
+            try { muxTmp?.delete() } catch (_: Exception) {}
         }
     }
 
     private fun downloadToFile(url: String, dest: File): Boolean {
-        // YouTube n throttling için Range header ve referer ekle, 1 retry
-        repeat(2) { attempt ->
+        repeat(3) { attempt ->
             try {
-                val req = Request.Builder().url(url)
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 13)")
+                val req = Request.Builder()
+                    .url(url)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
                     .header("Accept", "*/*")
                     .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
                     .header("Referer", "https://www.youtube.com/")
-                    .header("Range", "bytes=0-")
+                    .header("Connection", "keep-alive")
                     .build()
+
                 client.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) {
-                        // 403 throttled -> fail fast, fallback'a bırak
-                        if (resp.code == 403 && attempt == 0) return@repeat
-                        return false
+                        return@repeat
                     }
-                    val body = resp.body ?: return false
-                    dest.outputStream().use { out -> body.byteStream().copyTo(out) }
+                    val body = resp.body ?: return@repeat
+                    dest.outputStream().use { outStream ->
+                        body.byteStream().use { inStream ->
+                            val buffer = ByteArray(64 * 1024)
+                            var read: Int
+                            while (inStream.read(buffer).also { read = it } != -1) {
+                                outStream.write(buffer, 0, read)
+                            }
+                            outStream.flush()
+                        }
+                    }
                     if (dest.length() > 1024) return true else dest.delete()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                if (attempt == 1) return false
+                if (attempt == 2) return false
             }
         }
         return false
     }
 
-    private fun muxFiles(videoFile: File, audioFile: File, outFile: File): Boolean = muxFilesWithReason(videoFile, audioFile, outFile).first
-
-    private fun muxFilesWithReason(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
+    /**
+     * Video ve Ses parçalarını kronolojik zaman damgasıyla (interleaved) sıralı birleştiren kararlı Muxer
+     */
+    private fun muxFilesInterleaved(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
         var muxer: MediaMuxer? = null
         var vExtractor: MediaExtractor? = null
         var aExtractor: MediaExtractor? = null
+
         return try {
             vExtractor = MediaExtractor().apply { setDataSource(videoFile.absolutePath) }
             aExtractor = MediaExtractor().apply { setDataSource(audioFile.absolutePath) }
-            if (vExtractor.trackCount == 0) return false to "video track yok"
-            if (aExtractor.trackCount == 0) return false to "audio track yok"
-            val vTrackIdx = (0 until vExtractor.trackCount).firstOrNull { i -> vExtractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true } ?: 0
-            val aTrackIdx = (0 until aExtractor.trackCount).firstOrNull { i -> aExtractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true } ?: 0
+
+            if (vExtractor.trackCount == 0) return false to "Video izi bulunamadı"
+            if (aExtractor.trackCount == 0) return false to "Ses izi bulunamadı"
+
+            // Video ve Ses kanallarını bul
+            var vTrackIdx = -1
+            var aTrackIdx = -1
+
+            for (i in 0 until vExtractor.trackCount) {
+                val format = vExtractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                if (mime.startsWith("video/")) {
+                    vTrackIdx = i
+                    break
+                }
+            }
+
+            for (i in 0 until aExtractor.trackCount) {
+                val format = aExtractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                if (mime.startsWith("audio/")) {
+                    aTrackIdx = i
+                    break
+                }
+            }
+
+            if (vTrackIdx == -1) return false to "Geçerli video formatı bulunamadı"
+            if (aTrackIdx == -1) return false to "Geçerli ses formatı bulunamadı"
+
             val vFormat = vExtractor.getTrackFormat(vTrackIdx)
             val aFormat = aExtractor.getTrackFormat(aTrackIdx)
-            val vMime = vFormat.getString(MediaFormat.KEY_MIME) ?: ""
-            val aMime = aFormat.getString(MediaFormat.KEY_MIME) ?: ""
-            // MP4 muxer sadece avc/aac destekler, vp9/opus ise fail -> nedeni bildir
-            if (vMime.contains("vp9", true) || vMime.contains("vp8", true)) return false to "vp9 mp4'e muxlanamaz ($vMime)"
-            if (aMime.contains("opus", true) && vMime.contains("mp4", true)) {
-                // opus mp4 içinde sorun olabilir ama dene
-            }
+
             vExtractor.selectTrack(vTrackIdx)
             aExtractor.selectTrack(aTrackIdx)
+
             muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             val vMuxIdx = muxer.addTrack(vFormat)
             val aMuxIdx = muxer.addTrack(aFormat)
             muxer.start()
-            copyTrack(vExtractor, muxer, vMuxIdx)
-            copyTrack(aExtractor, muxer, aMuxIdx)
+
+            // İki izi aynı anda kronolojik sıra ile yaz (Buffer out of order hatasını önler)
+            val maxBufferSize = 1024 * 1024 // 1 MB buffer
+            val buffer = ByteBuffer.allocate(maxBufferSize)
+            val bufferInfo = MediaCodec.BufferInfo()
+
+            var videoDone = false
+            var audioDone = false
+
+            while (!videoDone || !audioDone) {
+                val vTime = if (!videoDone) vExtractor.sampleTime else Long.MAX_VALUE
+                val aTime = if (!audioDone) aExtractor.sampleTime else Long.MAX_VALUE
+
+                if (!videoDone && (audioDone || vTime <= aTime)) {
+                    bufferInfo.offset = 0
+                    bufferInfo.size = vExtractor.readSampleData(buffer, 0)
+                    if (bufferInfo.size < 0) {
+                        videoDone = true
+                    } else {
+                        bufferInfo.presentationTimeUs = vExtractor.sampleTime
+                        bufferInfo.flags = vExtractor.sampleFlags
+                        muxer.writeSampleData(vMuxIdx, buffer, bufferInfo)
+                        vExtractor.advance()
+                    }
+                } else if (!audioDone) {
+                    bufferInfo.offset = 0
+                    bufferInfo.size = aExtractor.readSampleData(buffer, 0)
+                    if (bufferInfo.size < 0) {
+                        audioDone = true
+                    } else {
+                        bufferInfo.presentationTimeUs = aExtractor.sampleTime
+                        bufferInfo.flags = aExtractor.sampleFlags
+                        muxer.writeSampleData(aMuxIdx, buffer, bufferInfo)
+                        aExtractor.advance()
+                    }
+                }
+            }
+
             muxer.stop()
             true to null
         } catch (e: Exception) {
             e.printStackTrace()
-            false to (e.message ?: "mux exception")
+            false to (e.message ?: "MediaMuxer hatası")
         } finally {
             try { muxer?.release() } catch (_: Exception) {}
             try { vExtractor?.release() } catch (_: Exception) {}
             try { aExtractor?.release() } catch (_: Exception) {}
-        }
-    }
-
-    private fun copyTrack(extractor: MediaExtractor, muxer: MediaMuxer, muxIdx: Int) {
-        val buf = ByteBuffer.allocate(1024 * 512)
-        val info = android.media.MediaCodec.BufferInfo()
-        while (true) {
-            info.offset = 0
-            info.size = extractor.readSampleData(buf, 0)
-            if (info.size < 0) break
-            info.presentationTimeUs = extractor.sampleTime
-            info.flags = extractor.sampleFlags
-            muxer.writeSampleData(muxIdx, buf, info)
-            extractor.advance()
         }
     }
 

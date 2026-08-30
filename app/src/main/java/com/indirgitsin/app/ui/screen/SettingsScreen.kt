@@ -1,9 +1,12 @@
 package com.indirgitsin.app.ui.screen
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,18 +17,32 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.indirgitsin.app.data.SettingsStore
+import com.indirgitsin.app.data.history.AppDatabase
 import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.data.lang.tr
-import com.indirgitsin.app.data.history.AppDatabase
 import kotlinx.coroutines.launch
+import java.io.File
+
+private fun calcCacheSizeBytes(context: Context): Long {
+    return try {
+        context.cacheDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
+    } catch (_: Exception) { 0L }
+}
+
+private fun formatByteSize(bytes: Long): String = when {
+    bytes >= 1_000_000_000 -> String.format("%.1f GB", bytes / 1_000_000_000.0)
+    bytes >= 1_000_000 -> String.format("%.1f MB", bytes / 1_000_000.0)
+    bytes >= 1_000 -> String.format("%.0f KB", bytes / 1_000.0)
+    bytes == 0L -> "0 KB"
+    else -> "$bytes B"
+}
 
 @Composable
 fun SettingsScreen() {
@@ -42,12 +59,13 @@ fun SettingsScreen() {
     val theme by SettingsStore.themeFlow(context).collectAsState(initial = "dark")
     val appColor by SettingsStore.appColorFlow(context).collectAsState(initial = "red")
     val language by SettingsStore.languageFlow(context).collectAsState(initial = "tr")
+    var cacheSizeBytes by remember { mutableLongStateOf(calcCacheSizeBytes(context)) }
 
-Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(t("settings"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
         Text(t("premium_exp"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        // Dil seçimi - modüler
+        // Dil seçimi
         PremiumSettingCard(
             icon = Icons.Rounded.Language,
             title = t("language"),
@@ -55,8 +73,13 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
             action = {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     com.indirgitsin.app.data.lang.AppStrings.supported.forEach { (code, label) ->
-                        val sel = language==code
-                        FilterChip(selected = sel, onClick = { scope.launch { SettingsStore.setLanguage(context, code) } }, label = { Text(label, style = MaterialTheme.typography.labelSmall) }, shape = RoundedCornerShape(8.dp))
+                        val sel = language == code
+                        FilterChip(
+                            selected = sel,
+                            onClick = { scope.launch { SettingsStore.setLanguage(context, code) } },
+                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                            shape = RoundedCornerShape(8.dp)
+                        )
                     }
                 }
             }
@@ -70,13 +93,13 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
             action = {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     com.indirgitsin.app.ui.theme.AppColor.entries.forEach { ac ->
-                        val sel = appColor==ac.key
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(14.dp))
-                                .then(if (sel) Modifier else Modifier)
+                        val sel = appColor == ac.key
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(14.dp))
                                 .background(ac.primary)
-                                .clickable { scope.launch { SettingsStore.setAppColor(context, ac.key) } }
-                                .let { m -> if (sel) m.then(Modifier.padding(2.dp)) else m },
+                                .clickable { scope.launch { SettingsStore.setAppColor(context, ac.key) } },
                             contentAlignment = Alignment.Center
                         ) {
                             if (sel) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
@@ -86,7 +109,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
             }
         )
 
-        // Tema secimi - acik/koyu/sistem
+        // Tema seçimi
         PremiumSettingCard(
             icon = Icons.Rounded.DarkMode,
             title = t("theme"),
@@ -106,6 +129,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
             }
         )
 
+        // İndirme Konumu
         PremiumSettingCard(
             icon = Icons.Rounded.Folder,
             title = t("download_location"),
@@ -114,7 +138,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = {
                         try {
-                            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS + "/$downloadFolder")
+                            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), downloadFolder)
                             if (!dir.exists()) dir.mkdirs()
                             val uri = Uri.parse(dir.absolutePath)
                             val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -126,10 +150,13 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                             Toast.makeText(context, "/Download/$downloadFolder", Toast.LENGTH_SHORT).show()
                         }
                     }) { Text(tr(language, "open"), fontWeight = FontWeight.Bold) }
-                    TextButton(onClick = { folderInput = downloadFolder; showFolderDialog = true }) { Text(tr(language, "change"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = { folderInput = downloadFolder; showFolderDialog = true }) {
+                        Text(tr(language, "change"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         )
+
         if (showFolderDialog) {
             AlertDialog(
                 onDismissRequest = { showFolderDialog = false },
@@ -154,6 +181,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                 dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text(tr(language, "cancel")) } }
             )
         }
+
         if (manualUpdate != null) {
             AlertDialog(
                 onDismissRequest = { manualUpdate = null },
@@ -168,6 +196,8 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                 dismissButton = { TextButton(onClick = { manualUpdate = null }) { Text(tr(language, "close")) } }
             )
         }
+
+        // Varsayılan Kalite
         PremiumSettingCard(
             icon = Icons.Rounded.HighQuality,
             title = t("default_quality"),
@@ -179,6 +209,8 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                 })
             }
         )
+
+        // Ses Formatı
         PremiumSettingCard(
             icon = Icons.Rounded.AudioFile,
             title = t("audio_format"),
@@ -191,9 +223,36 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                         Toast.makeText(context, tr(language, "audio_format_toast", next), Toast.LENGTH_SHORT).show()
                     },
                     shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary
-                ) { Text(" $audioFormat ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
+                ) {
+                    Text(" $audioFormat ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                }
             }
         )
+
+        // Önbellek Temizleme
+        PremiumSettingCard(
+            icon = Icons.Rounded.CleaningServices,
+            title = t("clear_cache"),
+            subtitle = "${t("cache_size")}: ${formatByteSize(cacheSizeBytes)}",
+            action = {
+                TextButton(onClick = {
+                    scope.launch {
+                        try {
+                            val oldSize = formatByteSize(cacheSizeBytes)
+                            context.cacheDir.listFiles()?.forEach { f ->
+                                try { f.deleteRecursively() } catch (_: Exception) {}
+                            }
+                            cacheSizeBytes = calcCacheSizeBytes(context)
+                            Toast.makeText(context, tr(language, "cache_cleared", oldSize), Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, e.message ?: "Hata", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }) { Text(tr(language, "clear"), fontWeight = FontWeight.Bold) }
+            }
+        )
+
+        // Gizlilik / Geçmiş
         PremiumSettingCard(
             icon = Icons.Rounded.Shield,
             title = t("privacy"),
@@ -212,6 +271,8 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                 }) { Text(tr(language, "clear"), fontWeight = FontWeight.Bold) }
             }
         )
+
+        // Güncelleme
         PremiumSettingCard(
             icon = Icons.Rounded.SystemUpdate,
             title = t("update"),
@@ -229,7 +290,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
             }
         )
 
-        // Hakkinda - Program hakkinda + versiyon + github
+        // Program Hakkında
         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -237,7 +298,9 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                     Spacer(Modifier.width(8.dp))
                     Text(t("about"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.weight(1f))
-                    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary) { Text(" v$version ", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), color = Color.White, style = MaterialTheme.typography.labelSmall) }
+                    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary) {
+                        Text(" v$version ", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    }
                 }
                 Text(
                     t("about_desc"),
@@ -262,35 +325,10 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                 }
             }
         }
-        Card(
-            onClick = {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eekilinc/indirgitsin"))
-                    context.startActivity(intent)
-                } catch (_: Exception) {
-                    Toast.makeText(context, "github.com/eekilinc/indirgitsin", Toast.LENGTH_SHORT).show()
-                }
-            },
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(1.dp)
-        ) {
-            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF24292F), modifier = Modifier.size(40.dp)) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.Rounded.Code, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(tr(language, "source_code"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                    Text(t("source_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Icon(Icons.Rounded.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+
+        // Lisans
         PremiumSettingCard(
-            icon = Icons.Rounded.Info,
+            icon = Icons.Rounded.VerifiedUser,
             title = t("license"),
             subtitle = t("license_sub"),
             action = {
@@ -320,7 +358,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
 
 @Composable
 private fun PremiumSettingCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     action: @Composable () -> Unit = {}
@@ -341,5 +379,3 @@ private fun PremiumSettingCard(
         }
     }
 }
-
-

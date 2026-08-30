@@ -60,6 +60,9 @@ fun DownloadsScreen(navController: NavController) {
     var files by remember { mutableStateOf<List<DownloadedFile>>(emptyList()) }
     var active by remember { mutableStateOf<List<ActiveDownload>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableIntStateOf(0) } // 0: All, 1: Videos, 2: Audio
+
     val downloadsTitle = t("downloads_title")
     val downloadsSubtitle = t("downloads_subtitle")
     val refreshText = t("refresh")
@@ -76,14 +79,14 @@ fun DownloadsScreen(navController: NavController) {
         val activeNow = scanActiveDownloads(context)
         active = activeNow
         val allFiles = scanDownloads(context)
-        // Bitmeden asagiya ekleme: aktif isimde olan dosyalari tamamlanan listeden cikar
         val activeNames = activeNow.map { it.name }.toSet()
         files = allFiles.filterNot { f -> activeNames.contains(f.name) }
         loading = false
     }
 
     LaunchedEffect(Unit) { refresh() }
-    // Aktif indirmeler varsa her saniye yenile
+
+    // Aktif indirmeler varsa periyodik yenile
     LaunchedEffect(active.isNotEmpty()) {
         while (active.isNotEmpty()) {
             kotlinx.coroutines.delay(1000)
@@ -96,16 +99,37 @@ fun DownloadsScreen(navController: NavController) {
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val totalBytes = remember(files) { files.sumOf { it.sizeBytes } }
+
+    val filteredFiles = remember(files, searchQuery, selectedFilter) {
+        files.filter { item ->
+            val matchesQuery = searchQuery.isBlank() || item.name.contains(searchQuery.trim(), ignoreCase = true)
+            val ext = item.name.substringAfterLast('.', "").lowercase()
+            val isAudio = ext in listOf("m4a", "mp3", "opus", "aac", "flac", "wav")
+            val isVideo = ext in listOf("mp4", "webm", "mkv", "mov", "avi")
+            val matchesFilter = when (selectedFilter) {
+                1 -> isVideo
+                2 -> isAudio
+                else -> true
+            }
+            matchesQuery && matchesFilter
+        }
+    }
+
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // Başlık ve Üst Butonlar
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(downloadsTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
-                Text("${files.size} $downloadsSubtitle", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "${files.size} $downloadsSubtitle • ${t("total_storage")}: ${formatSize(totalBytes)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             IconButton(onClick = { refresh() }) { Icon(Icons.Rounded.Refresh, contentDescription = refreshText) }
             if (files.isNotEmpty()) {
                 IconButton(onClick = {
-                    // Dosya yöneticisini aç
                     try {
                         val intent = Intent(Intent.ACTION_VIEW).apply {
                             setDataAndType(Uri.parse(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString()), "resource/folder")
@@ -119,7 +143,53 @@ fun DownloadsScreen(navController: NavController) {
             }
         }
 
-        // Aktif indirmeler - en ustte, Spotify tarzı
+        // Arama ve Filtre Çipleri
+        if (files.isNotEmpty() || active.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text(t("search_downloads")) },
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Rounded.Clear, contentDescription = "Temizle")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(
+                    selected = selectedFilter == 0,
+                    onClick = { selectedFilter = 0 },
+                    label = { Text(t("filter_all")) },
+                    shape = RoundedCornerShape(8.dp)
+                )
+                FilterChip(
+                    selected = selectedFilter == 1,
+                    onClick = { selectedFilter = 1 },
+                    label = { Text(t("filter_videos")) },
+                    leadingIcon = { Icon(Icons.Rounded.VideoLibrary, null, modifier = Modifier.size(16.dp)) },
+                    shape = RoundedCornerShape(8.dp)
+                )
+                FilterChip(
+                    selected = selectedFilter == 2,
+                    onClick = { selectedFilter = 2 },
+                    label = { Text(t("filter_audios")) },
+                    leadingIcon = { Icon(Icons.Rounded.Audiotrack, null, modifier = Modifier.size(16.dp)) },
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
+        }
+
+        // Aktif indirmeler
         if (active.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val downloadingCountText = try { String.format(downloadingCountTemplate, active.size) } catch (_: Exception) { downloadingCountTemplate }
@@ -157,16 +227,26 @@ fun DownloadsScreen(navController: NavController) {
                     Button(onClick = { refresh() }, shape = RoundedCornerShape(20.dp)) { Text(refreshText) }
                 }
             }
+        } else if (filteredFiles.isEmpty()) {
+            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(t("no_downloads"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
-                items(files, key = { it.name + it.dateMillis }) { item ->
-                    DownloadCard(item = item, onPlay = {
-                        val encodedUri = URLEncoder.encode(item.uri.toString(), StandardCharsets.UTF_8.toString())
-                        navController.navigate(com.indirgitsin.app.ui.navigation.Screen.Player.createRoute(encodedUri, item.name))
-                    }, onShare = { shareFile(context, item) }, onDelete = {
-                        deleteFile(context, item)
-                        refresh()
-                    })
+                items(filteredFiles, key = { it.name + it.dateMillis }) { item ->
+                    DownloadCard(
+                        item = item,
+                        onPlay = {
+                            val encodedUri = URLEncoder.encode(item.uri.toString(), StandardCharsets.UTF_8.toString())
+                            navController.navigate(com.indirgitsin.app.ui.navigation.Screen.Player.createRoute(encodedUri, item.name))
+                        },
+                        onOpenExternal = { playFile(context, item) },
+                        onShare = { shareFile(context, item) },
+                        onDelete = {
+                            deleteFile(context, item)
+                            refresh()
+                        }
+                    )
                 }
             }
         }
@@ -174,10 +254,17 @@ fun DownloadsScreen(navController: NavController) {
 }
 
 @Composable
-private fun DownloadCard(item: DownloadedFile, onPlay: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
+private fun DownloadCard(
+    item: DownloadedFile,
+    onPlay: () -> Unit,
+    onOpenExternal: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit
+) {
     val sizeText = formatSize(item.sizeBytes)
     val dateText = formatDate(item.dateMillis)
     val ext = item.name.substringAfterLast('.', "").uppercase()
+    var showMenu by remember { mutableStateOf(false) }
     val isAudioExt = ext == "M4A" || ext == "MP3" || ext == "OPUS" || ext == "AAC" || ext == "FLAC"
     val isVideo = !isAudioExt && (item.mimeType.startsWith("video") || item.name.endsWith(".mp4", true) || item.name.endsWith(".webm", true) || item.name.endsWith(".mkv", true))
     val typeLabel = when {
@@ -218,9 +305,44 @@ private fun DownloadCard(item: DownloadedFile, onPlay: () -> Unit, onShare: () -
                 }
                 Text("$sizeText • $dateText", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, contentDescription = t("play"), tint = MaterialTheme.colorScheme.primary) }
-            IconButton(onClick = onShare) { Icon(Icons.Rounded.Share, contentDescription = t("share")) }
-            IconButton(onClick = onDelete) { Icon(Icons.Rounded.Delete, contentDescription = t("delete"), tint = MaterialTheme.colorScheme.error) }
+            IconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, contentDescription = t("play_internal"), tint = MaterialTheme.colorScheme.primary) }
+            Box {
+                IconButton(onClick = { showMenu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "Daha fazla") }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(t("play_internal")) },
+                        leadingIcon = { Icon(Icons.Rounded.PlayCircle, null) },
+                        onClick = {
+                            showMenu = false
+                            onPlay()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(t("open_with")) },
+                        leadingIcon = { Icon(Icons.Rounded.OpenInNew, null) },
+                        onClick = {
+                            showMenu = false
+                            onOpenExternal()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(t("share")) },
+                        leadingIcon = { Icon(Icons.Rounded.Share, null) },
+                        onClick = {
+                            showMenu = false
+                            onShare()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(t("delete"), color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        }
+                    )
+                }
+            }
         }
     }
 }

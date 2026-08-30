@@ -30,6 +30,8 @@ fun HistoryScreen(
     val scope = rememberCoroutineScope()
     var history by remember { mutableStateOf<List<HistoryEntity>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showClearDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         historyDao.observeHistory().collect { list ->
@@ -38,19 +40,73 @@ fun HistoryScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val filteredHistory = remember(history, searchQuery) {
+        if (searchQuery.isBlank()) history
+        else history.filter {
+            it.title.contains(searchQuery.trim(), ignoreCase = true) ||
+            it.author.contains(searchQuery.trim(), ignoreCase = true)
+        }
+    }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text(t("clear_history_confirm_title")) },
+            text = { Text(t("clear_history_confirm_body")) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch { historyDao.clearAll() }
+                        showClearDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(t("confirm"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text(t("cancel"))
+                }
+            }
+        )
+    }
+
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(t("history_title"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
                 Text(t("history_sub", history.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (history.isNotEmpty()) {
-                TextButton(onClick = { scope.launch { historyDao.clearAll() } }) {
+                TextButton(onClick = { showClearDialog = true }) {
                     Icon(Icons.Rounded.DeleteSweep, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(t("clear"))
                 }
             }
+        }
+
+        if (history.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text(t("search_history")) },
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Rounded.Clear, contentDescription = "Temizle")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            )
         }
 
         if (loading) {
@@ -67,9 +123,13 @@ fun HistoryScreen(
                     Text(t("no_history_desc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        } else if (filteredHistory.isEmpty()) {
+            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(t("no_history"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
-                items(history, key = { it.videoId }) { item ->
+                items(filteredHistory, key = { it.videoId }) { item ->
                     HistoryCard(item = item, onClick = { onVideoClick(item) }, onDelete = { scope.launch { historyDao.delete(item.videoId) } })
                 }
             }

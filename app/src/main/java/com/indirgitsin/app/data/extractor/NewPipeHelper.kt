@@ -27,76 +27,105 @@ object NewPipeHelper {
             val author = extractor.uploaderName ?: "Bilinmeyen Kanal"
             val thumb = extractor.thumbnails.maxByOrNull { it.height }?.url ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
             val duration = extractor.length ?: 0L
-            // viewCount NewPipe'da -1 olabilir
-            // stream infos
+
             val streams = mutableListOf<StreamOption>()
-            // 1) Muxed (video+ses birlikte) - genelde 360p/720p
-            val videoStreams = extractor.videoStreams ?: emptyList()
-            for (vs in videoStreams) {
-                val url = vs.content ?: vs.url ?: continue
-                if (url.isBlank()) continue
-                val quality = vs.resolution ?: ""
-                val ext = when {
-                    vs.getFormat()?.name?.contains("WEBM", true) == true -> "webm"
-                    else -> "mp4"
-                }
-                streams.add(StreamOption("$quality • ${ext.uppercase()}", ext, quality, url, true, false))
-            }
-            // 2) Video-only (720p/1080p/4K) - DASH, videoOnlyStreams olmazsa bos
-            val videoOnlyStreams = try { extractor.videoOnlyStreams ?: emptyList() } catch (_: Exception) { emptyList() }
-            for (vs in videoOnlyStreams) {
-                val url = vs.content ?: vs.url ?: continue
-                if (url.isBlank()) continue
-                val quality = vs.resolution ?: ""
-                if (quality.isBlank()) continue
-                val ext = when {
-                    vs.getFormat()?.name?.contains("WEBM", true) == true -> "webm"
-                    else -> "mp4"
-                }
-                // ayni kalite muxed'de varsa ekleme (distinctBy url zaten var)
-                streams.add(StreamOption("$quality • ${ext.uppercase()} (sadece video)", ext, quality, url, true, false))
-            }
-            // 3) Ses - hem m4a/webm hem mp3 olarak goster (kullanici mp3 bekliyor)
-            val audioStreams = extractor.audioStreams ?: emptyList()
-            for (as_ in audioStreams) {
+
+            // 1) Ses Akışlarını Topla (M4A / AAC ses akışını bul)
+            val rawAudioStreams = extractor.audioStreams ?: emptyList()
+            for (as_ in rawAudioStreams) {
                 val url = as_.content ?: as_.url ?: continue
                 if (url.isBlank()) continue
                 val bitrate = as_.averageBitrate
+                val fmtName = as_.getFormat()?.name ?: ""
                 val baseExt = when {
-                    as_.getFormat()?.name?.contains("WEBM", true) == true -> "webm"
-                    as_.getFormat()?.name?.contains("MP3", true) == true -> "mp3"
+                    fmtName.contains("WEBM", true) || fmtName.contains("OPUS", true) -> "webm"
+                    fmtName.contains("MP3", true) -> "mp3"
                     else -> "m4a"
                 }
-                val q = if (bitrate > 0) "${bitrate}kbps" else as_.getFormat()?.name ?: ""
-                // orijinal format
-                streams.add(StreamOption("Ses • ${baseExt.uppercase()} ${if (bitrate>0) "${bitrate}kbps" else ""}".trim(), baseExt, q, url, false, true, bitrate = bitrate))
-                // mp3 secenegi yoksa ekle (ayni url, mp3 etiketli) - kullanici mp3 arıyor
+                val q = if (bitrate > 0) "${bitrate}kbps" else fmtName
+                streams.add(StreamOption("Ses • ${baseExt.uppercase()} ${if (bitrate > 0) "${bitrate}kbps" else ""}".trim(), baseExt, q, url, false, true, bitrate = bitrate))
                 if (baseExt != "mp3") {
                     val mp3Q = if (bitrate > 0) "${bitrate}kbps" else q.ifBlank { "128kbps" }
                     val mp3Bitrate = if (bitrate > 0) bitrate else 128
                     streams.add(StreamOption("Ses • MP3 $mp3Q", "mp3", mp3Q, url, false, true, bitrate = mp3Bitrate))
                 }
             }
-            if (streams.isEmpty()) return@withContext null
-            // sadece mp4 video-only -> m4a/mp3 ile mux (webm MediaMuxer'da MP4'e muxlanamaz)
-            run {
-                val bestAudio = streams.filter { it.isAudioOnly && (it.extension == "m4a" || it.extension == "mp3") }.maxByOrNull { it.bitrate }
-                    ?: streams.filter { it.isAudioOnly && it.extension == "m4a" }.firstOrNull()
-                    ?: streams.filter { it.isAudioOnly }.firstOrNull()
-                if (bestAudio != null) {
-                    val videoOnly = streams.filter { it.isVideo && it.extension == "mp4" && it.label.contains("(") && it.audioUrl == null }.toList()
-                    for (v in videoOnly) {
-                        val q = v.quality.ifBlank { Regex("""(\d+p)""").find(v.label)?.value ?: v.label }
-                        if (streams.any { it.quality == q && it.isVideo && !it.label.contains("(") && it.audioUrl == null }) continue
-                        if (streams.any { it.quality == q && it.audioUrl == bestAudio.url && it.url == v.url }) continue
-                        val cleanLabel = "$q \u2022 MP4"
-                        streams.add(StreamOption(label = cleanLabel, extension = "mp4", quality = q, url = v.url, isVideo = true, isAudioOnly = false, bitrate = v.bitrate, audioUrl = bestAudio.url))
+
+            // En iyi M4A/AAC ses akışı (MediaMuxer MP4 uyumlu)
+            val bestM4aAudio = streams.filter { it.isAudioOnly && it.extension == "m4a" }.maxByOrNull { it.bitrate }
+                ?: streams.filter { it.isAudioOnly }.maxByOrNull { it.bitrate }
+
+            // 2) YouTube'un Doğrudan Sesli Video Akışları (Legacy Muxed - Genelde 360p / 720p)
+            val legacyVideoStreams = extractor.videoStreams ?: emptyList()
+            for (vs in legacyVideoStreams) {
+                val url = vs.content ?: vs.url ?: continue
+                if (url.isBlank()) continue
+                val quality = vs.resolution ?: ""
+                if (quality.isBlank()) continue
+                val fmtName = vs.getFormat()?.name ?: ""
+                val ext = if (fmtName.contains("WEBM", true)) "webm" else "mp4"
+                streams.add(StreamOption("$quality • ${ext.uppercase()}", ext, quality, url, true, false, bitrate = vs.bitrate))
+            }
+
+            // 3) DASH Video-Only Akışları (1080p, 720p, 480p vb.) -> Otomatik En İyi Ses ile Birleştir
+            val videoOnlyStreams = try { extractor.videoOnlyStreams ?: emptyList() } catch (_: Exception) { emptyList() }
+            for (vs in videoOnlyStreams) {
+                val url = vs.content ?: vs.url ?: continue
+                if (url.isBlank()) continue
+                val quality = vs.resolution ?: ""
+                if (quality.isBlank()) continue
+                val fmtName = vs.getFormat()?.name ?: ""
+                val isWebm = fmtName.contains("WEBM", true)
+                val ext = if (isWebm) "webm" else "mp4"
+
+                // Eğer MP4 uyumlu video ise ve sesimiz varsa, sesli olarak mux seçeneği ekle
+                if (!isWebm && bestM4aAudio != null) {
+                    val cleanLabel = "$quality • MP4"
+                    // Aynı kalite zaten inherent legacy muxed'de yoksa veya daha yüksek bitrate ise
+                    if (streams.none { it.quality == quality && it.isVideo && it.audioUrl == null && it.extension == "mp4" }) {
+                        streams.add(
+                            StreamOption(
+                                label = cleanLabel,
+                                extension = "mp4",
+                                quality = quality,
+                                url = url,
+                                isVideo = true,
+                                isAudioOnly = false,
+                                bitrate = vs.bitrate,
+                                audioUrl = bestM4aAudio.url
+                            )
+                        )
                     }
+                } else if (isWebm && bestM4aAudio != null) {
+                    // WebM video için de ses bağla
+                    streams.add(
+                        StreamOption(
+                            label = "$quality • WEBM",
+                            extension = "webm",
+                            quality = quality,
+                            url = url,
+                            isVideo = true,
+                            isAudioOnly = false,
+                            bitrate = vs.bitrate,
+                            audioUrl = bestM4aAudio.url
+                        )
+                    )
                 }
             }
-            val sorted = streams.distinctBy { it.url + (it.audioUrl ?: "") to it.extension }.sortedWith(compareBy<StreamOption> { !it.isVideo }.thenByDescending { extractQualityNumber(it.quality) }.thenByDescending { it.bitrate })
+
+            if (streams.isEmpty()) return@withContext null
+
+            // Tekilleştir ve sırala: Videolar önce (yüksek çözünürlükten düşüğe), sonra sesler
+            val sorted = streams.distinctBy { (it.quality + it.extension + (it.audioUrl ?: "")) to it.isVideo }
+                .sortedWith(
+                    compareBy<StreamOption> { !it.isVideo }
+                        .thenByDescending { extractQualityNumber(it.quality) }
+                        .thenByDescending { it.bitrate }
+                )
+
             VideoInfo(videoId, title, author, thumb, duration, 0L, "https://www.youtube.com/watch?v=$videoId", sorted)
         } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }
