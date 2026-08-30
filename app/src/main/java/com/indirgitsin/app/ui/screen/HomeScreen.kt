@@ -165,7 +165,8 @@ fun HomeScreen(
             onTabChange = { selectedTab = it },
             onDismiss = { showSheet = false },
             onDownload = { opt -> onDownload(selectedVideo!!, opt); showSheet = false },
-            onPreview = { /* handled inside sheet now via direct intent */ }
+            onPreview = { /* handled inside sheet now via direct intent */ },
+            filterChip = selectedChip
         )
     }
 }
@@ -549,7 +550,8 @@ private fun YtDownloadSheet(
     onTabChange: (Int) -> Unit,
     onDismiss: () -> Unit,
     onDownload: (StreamOption) -> Unit,
-    onPreview: () -> Unit
+    onPreview: () -> Unit,
+    filterChip: Int = 0
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
@@ -578,14 +580,30 @@ private fun YtDownloadSheet(
                 SegmentedButton(selected = selectedTab == 0, onClick = { onTabChange(0) }, shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp), icon = { Icon(Icons.Rounded.Videocam, null, modifier = Modifier.size(16.dp)) }) { Text("Video") }
                 SegmentedButton(selected = selectedTab == 1, onClick = { onTabChange(1) }, shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp), icon = { Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(16.dp)) }) { Text("Ses") }
             }
-            val filtered = if (selectedTab == 0) video.streams.filter { it.isVideo } else video.streams.filter { it.isAudioOnly }
-            if (filtered.isEmpty()) {
+            // Chip filtreleri: 0 Tümü (tab'a göre), 1 Video, 2 Music, 3 Shorts, 4 4K
+            val baseByTab = if (selectedTab == 0) video.streams.filter { it.isVideo } else video.streams.filter { it.isAudioOnly }
+            val (filtered, chipNote) = when (filterChip) {
+                1 -> baseByTab.filter { it.isVideo } to null
+                2 -> video.streams.filter { it.isAudioOnly } to null
+                3 -> if (video.durationSeconds in 1..65) baseByTab to null else emptyList<StreamOption>() to "Bu video Shorts değil • Süre ${YoutubeLinkHelper.formatDuration(video.durationSeconds)} (>60sn)"
+                4 -> {
+                    val fourK = baseByTab.filter { it.quality.contains("2160") || it.label.contains("2160") || it.quality.contains("1440") || it.label.contains("1440") || it.label.contains("4K", true) || it.quality.contains("4K", true) }
+                    fourK to if (fourK.isEmpty()) "Bu videoda 4K seçenek yok • En yüksek ${baseByTab.firstOrNull()?.quality ?: "—"}" else null
+                }
+                else -> baseByTab to null
+            }
+            if (chipNote != null) {
+                Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
+                    Text(chipNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                }
+            }
+            if (filtered.isEmpty() && chipNote == null) {
                 Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-                        Text("Bu kategoride seçenek yok", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Bu filtrede seçenek yok", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            } else {
+            } else if (filtered.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     filtered.forEach { opt ->
                         YtOptionRow(label = opt.label, sublabel = "${opt.extension.uppercase()} • ${if (opt.isVideo) "Görüntü + Ses" else "Yalnız ses"}", isVideo = opt.isVideo, onClick = { onDownload(opt) })

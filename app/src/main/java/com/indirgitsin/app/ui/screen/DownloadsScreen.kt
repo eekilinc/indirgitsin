@@ -160,7 +160,16 @@ fun DownloadsScreen(navController: NavController) {
 private fun DownloadCard(item: DownloadedFile, onPlay: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
     val sizeText = formatSize(item.sizeBytes)
     val dateText = formatDate(item.dateMillis)
-    val isVideo = item.mimeType.startsWith("video") || item.name.endsWith(".mp4", true) || item.name.endsWith(".webm", true)
+    val ext = item.name.substringAfterLast('.', "").uppercase()
+    val isAudioExt = ext == "M4A" || ext == "MP3" || ext == "OPUS" || ext == "AAC" || ext == "FLAC"
+    val isVideo = !isAudioExt && (item.mimeType.startsWith("video") || item.name.endsWith(".mp4", true) || item.name.endsWith(".webm", true) || item.name.endsWith(".mkv", true))
+    val typeLabel = when {
+        isAudioExt -> "SES"
+        isVideo -> "VİDEO"
+        else -> "DOSYA"
+    }
+    val typeColor = if (isVideo) MaterialTheme.colorScheme.primary else Color(0xFF0F9D58)
+    val qualityFromName = Regex("_(\\d{3,4}p|\\d+kbps|\\d+k)_?").find(item.name)?.groupValues?.getOrNull(1)?.uppercase() ?: ""
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -168,16 +177,28 @@ private fun DownloadCard(item: DownloadedFile, onPlay: () -> Unit, onShare: () -
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), modifier = Modifier.size(48.dp)) {
+            Surface(shape = RoundedCornerShape(12.dp), color = typeColor.copy(alpha = 0.12f), modifier = Modifier.size(48.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(if (isVideo) Icons.Rounded.VideoFile else Icons.Rounded.AudioFile, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(if (isVideo) Icons.Rounded.VideoFile else Icons.Rounded.AudioFile, null, tint = typeColor)
                 }
             }
             Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(item.name, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = RoundedCornerShape(6.dp), color = typeColor, modifier = Modifier) {
+                        Text(typeLabel, color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                    Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                        Text(ext.ifBlank { "?" }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                    if (qualityFromName.isNotBlank()) {
+                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                            Text(qualityFromName, color = MaterialTheme.colorScheme.onTertiaryContainer, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    }
+                }
                 Text("$sizeText • $dateText", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(item.mimeType, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
             IconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, contentDescription = "Oynat", tint = MaterialTheme.colorScheme.primary) }
             IconButton(onClick = onShare) { Icon(Icons.Rounded.Share, contentDescription = "Paylaş") }
