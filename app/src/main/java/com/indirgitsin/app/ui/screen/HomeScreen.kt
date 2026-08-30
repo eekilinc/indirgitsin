@@ -766,8 +766,12 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                     Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    when { downloading -> safeFormat(t("downloading_progress"), addedCount, selected.size) addedCount > 0 -> safeFormat(t("added_count"), addedCount) else -> safeFormat(t("download_selected"), selected.size) },
+Text(
+                    when {
+                        downloading -> safeFormat(t("downloading_progress"), addedCount, selected.size)
+                        addedCount > 0 -> safeFormat(t("added_count"), addedCount)
+                        else -> safeFormat(t("download_selected"), selected.size)
+                    },
                     fontWeight = FontWeight.Bold
                 )
             }
