@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+import java.text.Normalizer
 
 object FileDownloader {
 
@@ -30,10 +31,11 @@ object FileDownloader {
         .build()
 
     fun enqueue(context: Context, video: VideoInfo, option: StreamOption) {
-        val safeTitle = video.title.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(60).trim()
+        // Better Turkish-compatible file name
+        val safeTitle = sanitizeFileName(video.title)
         val ext = option.extension.ifBlank { if (option.isAudioOnly) "m4a" else "mp4" }
         val qualityPart = option.quality.ifBlank { option.label.replace(" ", "_").take(20) }
-        val fileName = "${safeTitle}_${qualityPart}.$ext".replace(Regex("[^a-zA-Z0-9._-]"), "_")
+        val fileName = "${safeTitle}_${qualityPart}.$ext"
 
         // Register Receiver
         val receiver = object : BroadcastReceiver() {
@@ -70,6 +72,17 @@ object FileDownloader {
                 Toast.makeText(context, "Hata: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun sanitizeFileName(title: String): String {
+        // Remove/replace Turkish characters and special chars for filesystem compatibility
+        var result = Normalizer.normalize(title, Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "") // Remove diacritics (ş->s, ğ->g, ı->i, ç->c, ö->o, ü->u)
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_") // Replace filesystem forbidden chars
+            .replace(Regex("\\s+"), " ") // Normalize whitespace
+            .trim()
+        // Limit length, keep quality part space
+        return if (result.length > 80) result.take(80).trim() else result
     }
 
     private fun showNotification(context: Context, fileName: String) {

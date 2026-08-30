@@ -589,8 +589,13 @@ private fun YtDownloadSheet(
                 SegmentedButton(selected = selectedTab == 0, onClick = { onTabChange(0) }, shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp), icon = { Icon(Icons.Rounded.Videocam, null, modifier = Modifier.size(16.dp)) }) { Text(t("video")) }
                 SegmentedButton(selected = selectedTab == 1, onClick = { onTabChange(1) }, shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp), icon = { Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(16.dp)) }) { Text(t("audio")) }
             }
-            // Chip filtreleri: 0 Tümü (tab'a göre), 1 Video, 2 Music, 3 Shorts, 4 4K
-            val baseByTab = if (selectedTab == 0) video.streams.filter { it.isVideo } else video.streams.filter { it.isAudioOnly }
+// Chip filtreleri: 0 Tümü (tab'a göre), 1 Video, 2 Music, 3 Shorts, 4 4K
+            // Video tab: show muxed (video+audio) streams first, not video-only
+            val muxedStreams = video.streams.filter { it.isVideo && !it.label.contains("(video-only)", true) }
+            val videoOnlyStreams = video.streams.filter { it.isVideo && it.label.contains("(video-only)", true) }
+            val audioOnlyStreams = video.streams.filter { it.isAudioOnly }
+            
+            val baseByTab = if (selectedTab == 0) muxedStreams else audioOnlyStreams
             val (filtered, chipNote) = when (filterChip) {
                 1 -> baseByTab.filter { it.isVideo } to null
                 2 -> video.streams.filter { it.isAudioOnly } to null

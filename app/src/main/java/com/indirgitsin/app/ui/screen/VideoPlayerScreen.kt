@@ -31,11 +31,13 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.navigation.NavController
+import androidx.navigation.compose.popBackStack
 import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayerScreen(videoUri: Uri) {
+fun VideoPlayerScreen(videoUri: Uri, navController: NavController) {
     val context = LocalContext.current
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
@@ -52,7 +54,13 @@ fun VideoPlayerScreen(videoUri: Uri) {
     var isDragging by remember { mutableStateOf(false) }
     var dragPos by remember { mutableFloatStateOf(0f) }
 
-    DisposableEffect(Unit) {
+    // Properly release player on back press or when leaving screen
+    androidx.navigation.compose.BackHandler(enabled = true) {
+        exoPlayer.release()
+        navController.popBackStack()
+    }
+
+    DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
             override fun onPlaybackStateChanged(state: Int) {
@@ -67,7 +75,7 @@ fun VideoPlayerScreen(videoUri: Uri) {
     }
 
     // Pozisyonu periyodik güncelle
-    LaunchedEffect(isPlaying, isDragging) {
+    LaunchedEffect(exoPlayer, isPlaying, isDragging) {
         while (true) {
             if (!isDragging) {
                 positionMs = exoPlayer.currentPosition
