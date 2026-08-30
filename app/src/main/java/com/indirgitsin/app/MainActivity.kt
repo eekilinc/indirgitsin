@@ -46,9 +46,13 @@ class MainActivity : ComponentActivity() {
     private val vm: HomeViewModel by viewModels()
 
     private val requestNotifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val requestStoragePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT <= 28 && ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            requestStoragePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
 
         // Android 13+ bildirim izni - DownloadCompleteReceiver için
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -164,6 +168,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     vm.pendingUrl.collect { url ->
                         if (url != null) {
+                            vm.consumePendingUrl()
                             vm.onInputChange(url)
                             vm.fetch(url, this@MainActivity)
                             // Home'a git

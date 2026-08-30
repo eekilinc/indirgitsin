@@ -218,7 +218,7 @@ fun SettingsScreen() {
             action = {
                 Surface(
                     onClick = {
-                        val next = when (audioFormat) { "M4A" -> "MP3"; "MP3" -> "WEBM"; else -> "M4A" }
+                        val next = if (audioFormat == "M4A") "WEBM" else "M4A"
                         scope.launch { SettingsStore.setAudioFormat(context, next) }
                         Toast.makeText(context, tr(language, "audio_format_toast", next), Toast.LENGTH_SHORT).show()
                     },

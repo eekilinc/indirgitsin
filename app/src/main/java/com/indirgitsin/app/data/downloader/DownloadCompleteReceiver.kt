@@ -20,7 +20,7 @@ class DownloadCompleteReceiver : BroadcastReceiver() {
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val q = DownloadManager.Query().setFilterById(id)
         var title = "İndirme tamamlandı"
-        var status = DownloadManager.STATUS_SUCCESSFUL
+        var status = -1
         try {
             dm.query(q)?.use { c ->
                 if (c.moveToFirst()) {
@@ -29,6 +29,7 @@ class DownloadCompleteReceiver : BroadcastReceiver() {
                 }
             }
         } catch (_: Exception) {}
+        if (status != DownloadManager.STATUS_SUCCESSFUL && status != DownloadManager.STATUS_FAILED) return
 
         val channelId = "indirgitsin_complete"
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

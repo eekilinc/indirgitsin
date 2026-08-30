@@ -20,9 +20,14 @@ data class StreamOption(
     val isAudioOnly: Boolean,
     val sizeApprox: String = "",
     val bitrate: Int = 0,
-    val audioUrl: String? = null // mux için: video-only + audio birleştirme
+    val audioUrl: String? = null,
+    val isVideoOnly: Boolean = false,
+    val codec: String = "",
+    val audioCodec: String = ""
 ) {
-    val needsMuxing: Boolean get() = audioUrl != null
+    val needsMuxing: Boolean get() = isVideoOnly && !audioUrl.isNullOrBlank()
+    val hasAudio: Boolean get() = isAudioOnly || (isVideo && (!isVideoOnly || needsMuxing))
+    val isDownloadable: Boolean get() = extension in setOf("mp4", "webm", "m4a", "mp3", "opus", "ogg") && hasAudio
 }
 
 data class PlaylistVideo(

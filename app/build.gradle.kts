@@ -10,10 +10,15 @@ val gitTagVersion = System.getenv("GITHUB_REF_NAME")?.removePrefix("v")?.takeIf 
 val runNumberVersion = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
 val appVersionCode = runNumberVersion ?: 1
 val appVersionName = gitTagVersion ?: "1.0.$appVersionCode"
+val releaseStore = System.getenv("RELEASE_STORE_FILE")
+val releaseStorePassword = System.getenv("RELEASE_STORE_PASSWORD")
+val releaseAlias = System.getenv("RELEASE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+val releaseSigningReady = listOf(releaseStore, releaseStorePassword, releaseAlias, releaseKeyPassword).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.indirgitsin.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.indirgitsin.app"
@@ -25,8 +30,19 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("distribution") {
+                storeFile = file(releaseStore!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("distribution")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -34,6 +50,8 @@ android {
             )
         }
         debug {
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
             isMinifyEnabled = false
         }
     }
@@ -65,9 +83,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
 
-    // Networking & Download (NewPipe yerine Piped + oEmbed - JitPack'e bağımlı değil)
+    // Networking and persistent downloads
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // zemer-cipher: YouTube cipher + PoToken (composite build from cipher/ submodule)
     implementation("com.zemer:cipher")
@@ -86,13 +105,10 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // ExoPlayer & Media3 Muxer / Transformer
+    // In-app playback (muxing uses android.media.MediaMuxer)
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-ui:1.3.1")
     implementation("androidx.media3:media3-common:1.3.1")
-    implementation("androidx.media3:media3-muxer:1.3.1")
-    implementation("androidx.media3:media3-transformer:1.3.1")
-    implementation("androidx.media3:media3-extractor:1.3.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
@@ -100,4 +116,16 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+}
+
+val checkReleaseSigning by tasks.registering {
+    doLast {
+        check(releaseSigningReady && file(releaseStore!!).isFile) {
+            "Release imzası eksik. RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS ve RELEASE_KEY_PASSWORD tanımlanmalı."
+        }
+    }
+}
+tasks.matching { it.name in setOf("packageRelease", "assembleRelease", "bundleRelease") }.configureEach {
+    dependsOn(checkReleaseSigning)
 }

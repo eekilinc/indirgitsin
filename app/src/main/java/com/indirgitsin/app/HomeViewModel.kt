@@ -9,8 +9,11 @@ import com.indirgitsin.app.util.YoutubeLinkHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 
 class HomeViewModel : ViewModel() {
+    private var fetchJob: Job? = null
 
     var historyDao: com.indirgitsin.app.data.history.HistoryDao? = null
 
@@ -29,12 +32,15 @@ class HomeViewModel : ViewModel() {
     fun onInputChange(value: String) { _inputUrl.value = value }
 
     fun setPendingUrl(url: String) { _pendingUrl.value = url }
+    fun consumePendingUrl() { _pendingUrl.value = null }
 
     fun setClipboardSuggestion(url: String) { _clipboardSuggestion.value = url }
 
     fun clearClipboardSuggestion() { _clipboardSuggestion.value = null }
 
     fun fetch(url: String, context: android.content.Context) {
+        fetchJob?.cancel()
+        val appContext = context.applicationContext
         val normalized = YoutubeLinkHelper.findYoutubeUrlInText(url) ?: url
         if (!YoutubeLinkHelper.isValidYoutubeUrl(normalized)) {
             _uiState.value = UiState.Error("Geçerli bir YouTube / YouTube Music linki gir. Örn: https://youtu.be/... veya playlist linki")
@@ -42,17 +48,19 @@ class HomeViewModel : ViewModel() {
         }
         val playlistId = YoutubeLinkHelper.extractPlaylistId(normalized)
         _uiState.value = UiState.Loading
-        viewModelScope.launch {
+        fetchJob = viewModelScope.launch {
             // Once playlist dene
             if (playlistId != null) {
                 val pl = NewPipePlaylistHelper.extract(playlistId)
+                ensureActive()
                 if (pl != null && pl.videos.isNotEmpty()) {
                     _uiState.value = UiState.PlaylistSuccess(pl)
                     return@launch
                 }
             }
             // Video olarak dene
-            val result = YoutubeExtractor.extract(normalized, context)
+            val result = YoutubeExtractor.extract(normalized, appContext)
+            ensureActive()
             result.onSuccess { video ->
                 if (video.streams.isEmpty()) {
                     _uiState.value = UiState.Error("Video bulundu ama indirilebilir akış bulunamadı. Farklı bir video dene.")
@@ -78,5 +86,5 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun reset() { _uiState.value = UiState.Idle }
+    fun reset() { fetchJob?.cancel(); _uiState.value = UiState.Idle }
 }

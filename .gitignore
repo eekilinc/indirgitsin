@@ -17,3 +17,6 @@ Thumbs.db
 # APK
 *.apk
 *.aab
+
+# Local validation tools
+.local-tools/

@@ -9,6 +9,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +38,13 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.indirgitsin.app.data.downloader.FileDownloader
+import com.indirgitsin.app.data.SettingsStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class DownloadedFile(
     val name: String,
@@ -51,12 +60,19 @@ data class ActiveDownload(
     val name: String,
     val bytesDownloaded: Long,
     val totalBytes: Long,
-    val status: Int
+    val status: Int,
+    val workId: UUID? = null,
+    val stage: String? = null,
+    val percent: Int? = null
 )
 
 @Composable
 fun DownloadsScreen(navController: NavController) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val workManager = remember(context) { WorkManager.getInstance(context.applicationContext) }
+    val jobs by remember(workManager) { workManager.getWorkInfosByTagFlow(FileDownloader.TAG) }.collectAsState(initial = emptyList())
+    val downloadFolder by SettingsStore.downloadSubfolderFlow(context).collectAsState(initial = "IndirGitsin")
     var files by remember { mutableStateOf<List<DownloadedFile>>(emptyList()) }
     var active by remember { mutableStateOf<List<ActiveDownload>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -75,24 +91,35 @@ fun DownloadsScreen(navController: NavController) {
     val emptyDownloadsDesc = t("empty_downloads_desc")
 
     fun refresh() {
-        loading = true
-        val activeNow = scanActiveDownloads(context)
-        active = activeNow
-        val allFiles = scanDownloads(context)
-        val activeNames = activeNow.map { it.name }.toSet()
-        files = allFiles.filterNot { f -> activeNames.contains(f.name) }
-        loading = false
+        scope.launch {
+            loading = true
+            val snapshot = withContext(Dispatchers.IO) {
+                scanActiveDownloads(context) to (completedDownloads(context, jobs) + scanDownloads(context, downloadFolder)).distinctBy { it.uri }
+            }
+            active = snapshot.first
+            files = snapshot.second.filterNot { file -> snapshot.first.any { it.name == file.name } }
+            loading = false
+        }
     }
 
-    LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(downloadFolder, jobs.map { it.id to it.state }) { refresh() }
+
+    val workerActive = jobs.filter { !it.state.isFinished }.map { job ->
+        ActiveDownload(job.id.mostSignificantBits,
+            job.progress.getString("name") ?: job.tags.firstOrNull { it.startsWith("title:") }?.removePrefix("title:") ?: "Video",
+            job.progress.getLong("bytes", 0), job.progress.getLong("total", -1),
+            if (job.state == WorkInfo.State.RUNNING) android.app.DownloadManager.STATUS_RUNNING else android.app.DownloadManager.STATUS_PENDING,
+            job.id, job.progress.getString("stage") ?: "Sırada", job.progress.getInt("percent", 0))
+    }
+    val allActive = active + workerActive
 
     // Aktif indirmeler varsa periyodik yenile
     LaunchedEffect(active.isNotEmpty()) {
         while (active.isNotEmpty()) {
             kotlinx.coroutines.delay(1000)
-            active = scanActiveDownloads(context)
+            active = withContext(Dispatchers.IO) { scanActiveDownloads(context) }
             if (active.isEmpty()) {
-                val allFiles = scanDownloads(context)
+                val allFiles = withContext(Dispatchers.IO) { scanDownloads(context, downloadFolder) }
                 val activeNames = active.map { it.name }.toSet()
                 files = allFiles.filterNot { f -> activeNames.contains(f.name) }
             }
@@ -105,8 +132,8 @@ fun DownloadsScreen(navController: NavController) {
         files.filter { item ->
             val matchesQuery = searchQuery.isBlank() || item.name.contains(searchQuery.trim(), ignoreCase = true)
             val ext = item.name.substringAfterLast('.', "").lowercase()
-            val isAudio = ext in listOf("m4a", "mp3", "opus", "aac", "flac", "wav")
-            val isVideo = ext in listOf("mp4", "webm", "mkv", "mov", "avi")
+            val isAudio = item.mimeType.startsWith("audio/")
+            val isVideo = item.mimeType.startsWith("video/")
             val matchesFilter = when (selectedFilter) {
                 1 -> isVideo
                 2 -> isAudio
@@ -144,7 +171,7 @@ fun DownloadsScreen(navController: NavController) {
         }
 
         // Arama ve Filtre Çipleri
-        if (files.isNotEmpty() || active.isNotEmpty()) {
+        if (files.isNotEmpty() || allActive.isNotEmpty()) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -190,31 +217,34 @@ fun DownloadsScreen(navController: NavController) {
         }
 
         // Aktif indirmeler
-        if (active.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val downloadingCountText = try { String.format(downloadingCountTemplate, active.size) } catch (_: Exception) { downloadingCountTemplate }
+        if (allActive.isNotEmpty()) {
+            Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val downloadingCountText = try { String.format(downloadingCountTemplate, allActive.size) } catch (_: Exception) { downloadingCountTemplate }
                 Text(downloadingCountText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                active.forEach { item ->
+                allActive.forEach { item ->
                     ActiveDownloadCard(item, onCancel = {
                         try {
-                            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
-                            dm.remove(item.id)
+                            if (item.workId != null) FileDownloader.cancel(context, item.workId)
+                            else {
+                                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                dm.remove(item.id)
+                            }
                             val msg = try { String.format(cancelledTemplate, item.name) } catch (_: Exception) { cancelledTemplate }
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         } catch (_: Exception) {}
-                        val an = scanActiveDownloads(context)
-                        active = an
-                        val all = scanDownloads(context)
-                        val anNames = an.map { it.name }.toSet()
-                        files = all.filterNot { f -> anNames.contains(f.name) }
+                        refresh()
                     })
                 }
             }
         }
 
+        jobs.filter { it.state == WorkInfo.State.FAILED }.takeLast(3).forEach { job ->
+            Text("${job.outputData.getString("name") ?: "Video"}: ${job.outputData.getString("error") ?: "İndirme başarısız"}",
+                color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else if (files.isEmpty() && active.isEmpty()) {
+        } else if (files.isEmpty() && allActive.isEmpty()) {
             Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), modifier = Modifier.size(64.dp)) {
@@ -237,14 +267,15 @@ fun DownloadsScreen(navController: NavController) {
                     DownloadCard(
                         item = item,
                         onPlay = {
-                            val encodedUri = URLEncoder.encode(item.uri.toString(), StandardCharsets.UTF_8.toString())
-                            navController.navigate(com.indirgitsin.app.ui.navigation.Screen.Player.createRoute(encodedUri, item.name))
+                            navController.navigate(Screen.Player.createRoute(item.uri.toString(), item.name))
                         },
                         onOpenExternal = { playFile(context, item) },
                         onShare = { shareFile(context, item) },
                         onDelete = {
-                            deleteFile(context, item)
-                            refresh()
+                            scope.launch {
+                                deleteFile(context, item)
+                                refresh()
+                            }
                         }
                     )
                 }
@@ -265,7 +296,7 @@ private fun DownloadCard(
     val dateText = formatDate(item.dateMillis)
     val ext = item.name.substringAfterLast('.', "").uppercase()
     var showMenu by remember { mutableStateOf(false) }
-    val isAudioExt = ext == "M4A" || ext == "MP3" || ext == "OPUS" || ext == "AAC" || ext == "FLAC"
+    val isAudioExt = item.mimeType.startsWith("audio/")
     val isVideo = !isAudioExt && (item.mimeType.startsWith("video") || item.name.endsWith(".mp4", true) || item.name.endsWith(".webm", true) || item.name.endsWith(".mkv", true))
     val typeLabel = when {
         isAudioExt -> t("type_audio")
@@ -347,7 +378,17 @@ private fun DownloadCard(
     }
 }
 
-private fun scanDownloads(context: Context): List<DownloadedFile> {
+private fun completedDownloads(context: Context, jobs: List<WorkInfo>): List<DownloadedFile> =
+    jobs.filter { it.state == WorkInfo.State.SUCCEEDED }.mapNotNull { job ->
+        val data = job.outputData
+        val uri = data.getString("uri")?.let(Uri::parse) ?: return@mapNotNull null
+        val exists = try { context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } ?: false } catch (_: Exception) { false }
+        if (!exists) return@mapNotNull null
+        DownloadedFile(data.getString("name") ?: "Video", uri, data.getLong("size", 0),
+            data.getLong("completedAt", 0), data.getString("mime") ?: "video/mp4")
+    }
+
+private fun scanDownloads(context: Context, folder: String): List<DownloadedFile> {
     val result = mutableListOf<DownloadedFile>()
     try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -361,7 +402,8 @@ private fun scanDownloads(context: Context): List<DownloadedFile> {
             try {
                 context.contentResolver.query(
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                    projection, null, null, "${MediaStore.Downloads.DATE_MODIFIED} DESC"
+                    projection, "${MediaStore.Downloads.IS_PENDING} = 0 AND ${MediaStore.Downloads.RELATIVE_PATH} IN (?, ?)",
+                    arrayOf("Download/$folder/", "Download/IndirGitsin/"), "${MediaStore.Downloads.DATE_MODIFIED} DESC"
                 )?.use { cursor ->
                     val nameIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
                     val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
@@ -386,7 +428,7 @@ private fun scanDownloads(context: Context): List<DownloadedFile> {
         try {
             @Suppress("DEPRECATION")
             val downloadRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val dirsToScan = listOf(downloadRoot, File(downloadRoot, "IndirGitsin")) + (downloadRoot.listFiles()?.filter { it.isDirectory } ?: emptyList())
+            val dirsToScan = if (Build.VERSION.SDK_INT < 29) listOf(File(downloadRoot, folder), File(downloadRoot, "IndirGitsin")) else emptyList()
             for (dir in dirsToScan.distinctBy { it.absolutePath }) {
                 if (!dir.exists() || !dir.isDirectory) continue
                 dir.listFiles()?.sortedByDescending { it.lastModified() }?.forEach { f ->
@@ -437,8 +479,8 @@ private fun scanActiveDownloads(context: Context): List<ActiveDownload> {
 
 @Composable
 private fun ActiveDownloadCard(item: ActiveDownload, onCancel: () -> Unit) {
-    val progress = if (item.totalBytes > 0) item.bytesDownloaded.toFloat() / item.totalBytes else 0f
-    val statusText = when (item.status) {
+    val progress = item.percent?.div(100f) ?: if (item.totalBytes > 0) item.bytesDownloaded.toFloat() / item.totalBytes else 0f
+    val statusText = item.stage ?: when (item.status) {
         android.app.DownloadManager.STATUS_RUNNING -> t("status_running")
         android.app.DownloadManager.STATUS_PAUSED -> t("status_paused")
         android.app.DownloadManager.STATUS_PENDING -> t("status_pending")
@@ -496,13 +538,15 @@ private fun shareFile(context: Context, item: DownloadedFile) {
     }
 }
 
-private fun deleteFile(context: Context, item: DownloadedFile) {
+private suspend fun deleteFile(context: Context, item: DownloadedFile) {
     val lang = Locale.getDefault().language
     try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && item.file == null) {
-            context.contentResolver.delete(item.uri, null, null)
-        } else {
-            item.file?.delete()
+        withContext(Dispatchers.IO) {
+            if (item.file == null) {
+                check(context.contentResolver.delete(item.uri, null, null) > 0) { "Dosya silinemedi." }
+            } else {
+                check(item.file.delete()) { "Dosya silinemedi." }
+            }
         }
         Toast.makeText(context, tr(lang, "deleted", item.name), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
@@ -521,5 +565,3 @@ private fun formatSize(bytes: Long): String = when {
 private fun formatDate(millis: Long): String = try {
     SimpleDateFormat("dd MMM yyyy HH:mm", Locale("tr", "TR")).format(Date(millis))
 } catch (_: Exception) { "" }
-
-

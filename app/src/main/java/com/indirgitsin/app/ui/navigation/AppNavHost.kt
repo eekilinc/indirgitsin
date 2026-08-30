@@ -30,7 +30,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Player : Screen("player/{uri}/{title}") {
         fun createRoute(uri: String, title: String) = 
-            "player/${URLEncoder.encode(uri, StandardCharsets.UTF_8.toString())}/${URLEncoder.encode(title, StandardCharsets.UTF_8.toString())}"
+            "player/${Uri.encode(uri)}/${Uri.encode(title)}"
     }
 }
 
@@ -91,8 +91,8 @@ fun AppNavHost(
         ) { backStackEntry ->
             val encodedUri = backStackEntry.arguments?.getString("uri") ?: ""
             val encodedTitle = backStackEntry.arguments?.getString("title") ?: ""
-            val uri = URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString())
-            val title = URLDecoder.decode(encodedTitle, StandardCharsets.UTF_8.toString())
+            val uri = encodedUri
+            val title = encodedTitle
             VideoPlayerScreen(videoUri = Uri.parse(uri), title = title, navController = navController)
         }
     }

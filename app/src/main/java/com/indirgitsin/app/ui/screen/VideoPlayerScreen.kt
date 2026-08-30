@@ -38,13 +38,16 @@ import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import com.indirgitsin.app.data.lang.t
 import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerScreen(videoUri: Uri, title: String = "", navController: NavController) {
     val context = LocalContext.current
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
-    val exoPlayer = remember {
+    val exoPlayer = remember(videoUri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(videoUri))
             prepare()
@@ -70,8 +73,15 @@ fun VideoPlayerScreen(videoUri: Uri, title: String = "", navController: NavContr
 
     // Properly release player on back press or when leaving screen
     BackHandler(enabled = true) {
-        exoPlayer.release()
         navController.popBackStack()
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, exoPlayer) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) exoPlayer.pause()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     DisposableEffect(exoPlayer) {
@@ -177,7 +187,6 @@ fun VideoPlayerScreen(videoUri: Uri, title: String = "", navController: NavContr
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = {
-                        exoPlayer.release()
                         navController.popBackStack()
                     }) {
                         Icon(Icons.Rounded.ArrowBack, contentDescription = "Geri", tint = Color.White)
@@ -324,4 +333,3 @@ fun VideoPlayerScreen(videoUri: Uri, title: String = "", navController: NavContr
         }
     }
 }
-

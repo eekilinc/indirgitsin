@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,10 +34,12 @@ import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.UiState
 import com.indirgitsin.app.data.model.VideoInfo
-import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.ui.theme.YtRed
 import com.indirgitsin.app.util.YoutubeLinkHelper
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import com.indirgitsin.app.data.SettingsStore
+import com.indirgitsin.app.data.model.StreamSelector
 
 private fun safeFormat(format: String, vararg args: Any): String = try {
     String.format(format, *args)
@@ -514,13 +515,13 @@ private fun YtVideoCard(video: VideoInfo, onClick: () -> Unit) {
                     // YouTube chips
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                         Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                            Text(" " + t("badge_4k") + " ", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
+                            Text(video.streams.firstOrNull { it.isVideo }?.quality ?: t("audio"), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
                         }
                         Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                             Row(Modifier.padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Rounded.AudioFile, null, modifier = Modifier.size(12.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text(t("badge_mp3"), style = MaterialTheme.typography.labelSmall)
+                                Text(video.streams.firstOrNull { it.isAudioOnly }?.extension?.uppercase() ?: t("audio"), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -563,6 +564,9 @@ private fun YtDownloadSheet(
     filterChip: Int = 0
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val settingsContext = LocalContext.current
+    val autoHigh by SettingsStore.autoHighFlow(settingsContext).collectAsState(initial = true)
+    val audioFormat by SettingsStore.audioFormatFlow(settingsContext).collectAsState(initial = "M4A")
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -591,12 +595,15 @@ private fun YtDownloadSheet(
             }
 // Chip filtreleri: 0 Tümü (tab'a göre), 1 Video, 2 Music, 3 Shorts, 4 4K
             // Video tab: sesli mux'lar (parantezsiz) + sentezlenmiş mux'lar; video-only'ler gizli (artık otomatik birleştiriliyor)
-            val muxedStreams = video.streams.filter { it.isVideo && !it.label.contains("(") }
-            val audioOnlyStreams = video.streams.filter { it.isAudioOnly }
+            val recommended = StreamSelector.preferred(video.streams, autoHigh, audioFormat)
+            val muxedStreams = video.streams.filter { it.isVideo && it.isDownloadable }
+                .sortedBy { if (it == recommended) 0 else 1 }
+            val audioOnlyStreams = video.streams.filter { it.isAudioOnly && it.isDownloadable }
+                .sortedWith(compareByDescending<StreamOption> { it.extension.equals(audioFormat, true) }.thenByDescending { it.bitrate })
             val baseByTab = if (selectedTab == 0) muxedStreams else audioOnlyStreams
             val (filtered, chipNote) = when (filterChip) {
                 1 -> baseByTab.filter { it.isVideo } to null
-                2 -> video.streams.filter { it.isAudioOnly } to null
+                2 -> audioOnlyStreams to null
                 3 -> if (video.durationSeconds in 1..65) baseByTab to null else emptyList<StreamOption>() to t("shorts_not", YoutubeLinkHelper.formatDuration(video.durationSeconds))
                 4 -> {
                     val fourK = baseByTab.filter { it.quality.contains("2160") || it.label.contains("2160") || it.quality.contains("1440") || it.label.contains("1440") || it.label.contains("4K", true) || it.quality.contains("4K", true) }
@@ -662,7 +669,7 @@ private fun YtOptionRow(label: String, sublabel: String, isVideo: Boolean, onCli
 private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selected by remember { mutableStateOf(setOf<String>()) }
+    var selected by remember(playlist.id) { mutableStateOf(setOf<String>()) }
     var downloading by remember { mutableStateOf(false) }
     var addedCount by remember { mutableStateOf(0) }
     var currentProcessing by remember { mutableStateOf("") }
@@ -737,24 +744,21 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                     downloading = true
                     addedCount = 0
                     scope.launch {
-                        var ok = 0
-                        for (id in selected) {
-                            try {
-                                currentProcessing = id
-                                val info = com.indirgitsin.app.data.extractor.NewPipeHelper.extract(id)
-                                val best = info?.streams?.firstOrNull { it.isVideo } ?: info?.streams?.firstOrNull()
-                                if (info != null && best != null) {
-                                    com.indirgitsin.app.data.downloader.FileDownloader.enqueue(context, info, best)
-                                    ok++
-                                }
-                                addedCount++
-                                kotlinx.coroutines.delay(600)
-                            } catch (_: Exception) {}
+                        try {
+                            val ok = com.indirgitsin.app.data.downloader.FileDownloader.enqueuePlaylist(
+                                context, playlist.videos.filter { it.id in selected },
+                                SettingsStore.autoHighFlow(context).first(), SettingsStore.audioFormatFlow(context).first())
+                            addedCount = ok
+                            val finalToast = safeFormat(queueAddedCountTemplate, ok)
+                            android.widget.Toast.makeText(context, finalToast, android.widget.Toast.LENGTH_LONG).show()
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, e.message ?: "Kuyruğa eklenemedi", android.widget.Toast.LENGTH_LONG).show()
+                        } finally {
+                            downloading = false
+                            currentProcessing = ""
                         }
-                        downloading = false
-                        currentProcessing = ""
-                        val finalToast = try { String.format(queueAddedCountTemplate, ok) } catch (_: Exception) { queueAddedCountTemplate }
-                        android.widget.Toast.makeText(context, finalToast, android.widget.Toast.LENGTH_LONG).show()
                     }
                 },
                 enabled = selected.isNotEmpty() && !downloading,
@@ -833,11 +837,3 @@ private fun YtPreview() {
         )
     }
 }
-
-
-
-
-
-
-
-

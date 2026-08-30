@@ -37,21 +37,22 @@ class DownloaderImpl private constructor(private val client: OkHttpClient) : Dow
             }
             else -> builder.get()
         }
-        headers.forEach { (k, v) -> v.forEach { builder.header(k, it) } }
+        headers.forEach { (k, v) -> v.forEach { builder.addHeader(k, it) } }
         if (!headers.containsKey("User-Agent")) {
             builder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         }
         val okRequest = builder.build()
-        val response = client.newCall(okRequest).execute()
+        return client.newCall(okRequest).execute().use { response ->
         val body = response.body?.string() ?: ""
         val latestUrl = response.request.url.toString()
         val responseHeaders = response.headers.toMultimap().mapValues { it.value.toMutableList() }
-        return org.schabi.newpipe.extractor.downloader.Response(
+        org.schabi.newpipe.extractor.downloader.Response(
             response.code,
             response.message,
             responseHeaders,
             body,
             latestUrl
         )
+        }
     }
 }

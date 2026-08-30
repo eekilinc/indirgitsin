@@ -2,44 +2,37 @@ package com.indirgitsin.app.data.extractor
 
 import com.indirgitsin.app.data.model.PlaylistInfo
 import com.indirgitsin.app.data.model.PlaylistVideo
+import com.indirgitsin.app.util.YoutubeLinkHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.ServiceList
-import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubePlaylistLinkHandlerFactory
 
 object NewPipePlaylistHelper {
-
     suspend fun extract(playlistId: String): PlaylistInfo? = withContext(Dispatchers.IO) {
         try {
+            NewPipeHelper.ensureInitialized()
             val service = ServiceList.YouTube
-            val url = "https://www.youtube.com/playlist?list=$playlistId"
-            val linkHandler = service.playlistLHFactory.fromUrl(url)
-            val extractor = service.getPlaylistExtractor(linkHandler)
+            val extractor = service.getPlaylistExtractor(service.playlistLHFactory.fromUrl("https://www.youtube.com/playlist?list=$playlistId"))
             extractor.fetchPage()
-            val title = extractor.name ?: "Çalma Listesi"
-            val author = extractor.uploaderName ?: ""
-            val thumb = extractor.thumbnails.maxByOrNull { it.height }?.url ?: ""
-            val initial = extractor.initialPage
-            val items = initial.items ?: emptyList()
-            val videos = items.mapNotNull { item ->
-                try {
-                    // StreamInfoItem
-                    val id = when {
-                        item.url?.contains("v=") == true -> Regex("[?&]v=([a-zA-Z0-9_-]{11})").find(item.url ?: "")?.groupValues?.get(1)
-                        item.url?.contains("youtu.be") == true -> item.url?.substringAfterLast("/")
-                        else -> null
-                    } ?: return@mapNotNull null
-                    val t = item.name ?: "Video"
-                    val th = item.thumbnails.maxByOrNull { it.height }?.url ?: ""
-                    val dur = (item as? org.schabi.newpipe.extractor.stream.StreamInfoItem)?.duration ?: 0L
-                    PlaylistVideo(id, t, th, dur)
-                } catch (_: Exception) { null }
+            var page = extractor.initialPage
+            val videos = linkedMapOf<String, PlaylistVideo>()
+            var pageCount = 0
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                for (item in page.items) {
+                    val id = YoutubeLinkHelper.extractVideoId(item.url) ?: continue
+                    videos[id] = PlaylistVideo(id, item.name, item.thumbnails.maxByOrNull { it.height }?.url.orEmpty(), item.duration)
+                }
+                if (!page.hasNextPage()) break
+                check(++pageCount < 100) { "Çalma listesi çok uzun veya sonsuz bir radyo listesi." }
+                page = extractor.getPage(page.nextPage)
             }
-            // If no items but extractor has related? Try alternative: use getPage via extractor.getInitialPage
-            PlaylistInfo(playlistId, title, author, thumb, videos, videos.size)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
+            PlaylistInfo(playlistId, extractor.name, extractor.uploaderName,
+                extractor.thumbnails.maxByOrNull { it.height }?.url.orEmpty(), videos.values.toList(), videos.size)
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { null }
     }
 }
