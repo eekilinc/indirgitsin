@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.lang.t
+import com.indirgitsin.app.data.lang.tr
 import com.indirgitsin.app.data.history.AppDatabase
 import kotlinx.coroutines.launch
 
@@ -120,24 +121,24 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                                 setDataAndType(uri, "resource/folder")
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(Intent.createChooser(intent, t("open_folder")))
+                            context.startActivity(Intent.createChooser(intent, tr(language, "open_folder")))
                         } catch (e: Exception) {
                             Toast.makeText(context, "/Download/$downloadFolder", Toast.LENGTH_SHORT).show()
                         }
-                    }) { Text(t("open"), fontWeight = FontWeight.Bold) }
-                    TextButton(onClick = { folderInput = downloadFolder; showFolderDialog = true }) { Text(t("change"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
+                    }) { Text(tr(language, "open"), fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = { folderInput = downloadFolder; showFolderDialog = true }) { Text(tr(language, "change"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
                 }
             }
         )
         if (showFolderDialog) {
             AlertDialog(
                 onDismissRequest = { showFolderDialog = false },
-                title = { Text(t("folder_choose_title")) },
+                title = { Text(tr(language, "folder_choose_title")) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(t("folder_choose_desc"), style = MaterialTheme.typography.bodySmall)
+                        Text(tr(language, "folder_choose_desc"), style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(value = folderInput, onValueChange = { folderInput = it }, singleLine = true, placeholder = { Text("IndirGitsin") })
-                        Text(t("folder_example"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr(language, "folder_example"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 confirmButton = {
@@ -145,36 +146,36 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                         scope.launch {
                             val clean = folderInput.take(30).replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "IndirGitsin" }
                             SettingsStore.setDownloadSubfolder(context, clean)
-                            Toast.makeText(context, t("folder_saved", clean), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, tr(language, "folder_saved", clean), Toast.LENGTH_SHORT).show()
                         }
                         showFolderDialog = false
-                    }) { Text(t("save")) }
+                    }) { Text(tr(language, "save")) }
                 },
-                dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text(t("cancel")) } }
+                dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text(tr(language, "cancel")) } }
             )
         }
         if (manualUpdate != null) {
             AlertDialog(
                 onDismissRequest = { manualUpdate = null },
-                title = { Text(t("update_check_title", manualUpdate!!.latestTag)) },
-                text = { Text(manualUpdate!!.body.take(350).ifBlank { t("no_update_body") }) },
+                title = { Text(tr(language, "update_check_title", manualUpdate!!.latestTag)) },
+                text = { Text(manualUpdate!!.body.take(350).ifBlank { tr(language, "no_update_body") }) },
                 confirmButton = {
                     TextButton(onClick = {
                         com.indirgitsin.app.util.UpdateChecker.openUpdatePage(context, manualUpdate!!)
                         manualUpdate = null
-                    }) { Text(t("update_btn")) }
+                    }) { Text(tr(language, "update_btn")) }
                 },
-                dismissButton = { TextButton(onClick = { manualUpdate = null }) { Text(t("close")) } }
+                dismissButton = { TextButton(onClick = { manualUpdate = null }) { Text(tr(language, "close")) } }
             )
         }
         PremiumSettingCard(
             icon = Icons.Rounded.HighQuality,
             title = t("default_quality"),
-            subtitle = if (autoHigh) t("auto_high_on") else t("auto_high_off"),
+            subtitle = if (autoHigh) tr(language, "auto_high_on") else tr(language, "auto_high_off"),
             action = {
                 Switch(checked = autoHigh, onCheckedChange = { v ->
                     scope.launch { SettingsStore.setAutoHigh(context, v) }
-                    Toast.makeText(context, if (v) t("auto_high_toast_on") else t("auto_high_toast_off"), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, if (v) tr(language, "auto_high_toast_on") else tr(language, "auto_high_toast_off"), Toast.LENGTH_SHORT).show()
                 })
             }
         )
@@ -187,7 +188,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                     onClick = {
                         val next = when (audioFormat) { "M4A" -> "MP3"; "MP3" -> "WEBM"; else -> "M4A" }
                         scope.launch { SettingsStore.setAudioFormat(context, next) }
-                        Toast.makeText(context, t("audio_format_toast", next), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, tr(language, "audio_format_toast", next), Toast.LENGTH_SHORT).show()
                     },
                     shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary
                 ) { Text(" $audioFormat ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
@@ -203,12 +204,12 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                         try {
                             val db = AppDatabase.get(context)
                             db.historyDao().clearAll()
-                            Toast.makeText(context, t("history_cleared"), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, tr(language, "history_cleared"), Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
-                            Toast.makeText(context, t("privacy_stays"), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, tr(language, "privacy_stays"), Toast.LENGTH_SHORT).show()
                         }
                     }
-                }) { Text(t("clear"), fontWeight = FontWeight.Bold) }
+                }) { Text(tr(language, "clear"), fontWeight = FontWeight.Bold) }
             }
         )
         PremiumSettingCard(
@@ -222,9 +223,9 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                     scope.launch {
                         val info = com.indirgitsin.app.util.UpdateChecker.check(context)
                         checking = false
-                        if (info != null) manualUpdate = info else Toast.makeText(context, t("latest_version", version), Toast.LENGTH_SHORT).show()
+                        if (info != null) manualUpdate = info else Toast.makeText(context, tr(language, "latest_version", version), Toast.LENGTH_SHORT).show()
                     }
-                }) { Text(t("check"), fontWeight = FontWeight.Bold) }
+                }) { Text(tr(language, "check"), fontWeight = FontWeight.Bold) }
             }
         )
 
@@ -257,7 +258,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                 ) {
                     Icon(Icons.Rounded.OpenInNew, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(t("source_code"), fontWeight = FontWeight.Bold)
+                    Text(tr(language, "source_code"), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -282,7 +283,7 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(t("source_code"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text(tr(language, "source_code"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                     Text(t("source_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(Icons.Rounded.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -298,9 +299,9 @@ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.d
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eekilinc/indirgitsin/blob/main/LICENSE"))
                         context.startActivity(intent)
                     } catch (_: Exception) {
-                        Toast.makeText(context, t("mit"), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, tr(language, "mit"), Toast.LENGTH_SHORT).show()
                     }
-                }) { Text(t("see"), fontWeight = FontWeight.Bold) }
+                }) { Text(tr(language, "see"), fontWeight = FontWeight.Bold) }
             }
         )
 
@@ -340,4 +341,5 @@ private fun PremiumSettingCard(
         }
     }
 }
+
 
