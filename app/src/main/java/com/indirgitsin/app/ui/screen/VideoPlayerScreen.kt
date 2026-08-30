@@ -31,9 +31,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.activity.compose.BackHandler
 import androidx.navigation.NavController
-import androidx.navigation.compose.BackHandler
-import androidx.navigation.compose.popBackStack
 import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)
@@ -56,7 +55,7 @@ fun VideoPlayerScreen(videoUri: Uri, navController: NavController) {
     var dragPos by remember { mutableFloatStateOf(0f) }
 
     // Properly release player on back press or when leaving screen
-    androidx.navigation.compose.BackHandler(enabled = true) {
+    BackHandler(enabled = true) {
         exoPlayer.release()
         navController.popBackStack()
     }
