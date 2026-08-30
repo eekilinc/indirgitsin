@@ -495,7 +495,7 @@ private fun YtVideoCard(video: VideoInfo, onClick: () -> Unit) {
                     shape = RoundedCornerShape(4.dp),
                     color = YtRed
                 ) {
-                    Text(" ${video.streams.size} ${t("quality")} ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
+                    Text(" " + video.streams.size + " " + t("quality") + " ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
                 }
             }
             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
@@ -509,7 +509,7 @@ private fun YtVideoCard(video: VideoInfo, onClick: () -> Unit) {
                     // YouTube chips
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                         Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                            Text(" ${t("badge_4k")} ", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
+                            Text(" " + t("badge_4k") + " ", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
                         }
                         Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                             Row(Modifier.padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -679,7 +679,7 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = allSelected, onClick = { selected = if (allSelected) emptySet() else playlist.videos.map { it.id }.toSet() }, label = { Text(if (allSelected) t("deselect_all") else t("select_all")) })
                 Spacer(Modifier.weight(1f))
-                Text("${selected.size} ${t("selected")}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(selected.size.toString() + " " + t("selected"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (playlist.videos.isEmpty()) {
                 Text(t("empty_playlist"), style = MaterialTheme.typography.bodySmall)
@@ -825,6 +825,7 @@ private fun YtPreview() {
         )
     }
 }
+
 
 
 
