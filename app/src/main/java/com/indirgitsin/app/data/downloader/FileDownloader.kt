@@ -206,7 +206,7 @@ object FileDownloader {
 
             fun updateProgress() {
                 val now = System.currentTimeMillis()
-                if (now - lastUpdate > 400) {
+                if (now - lastUpdate > 300) {
                     lastUpdate = now
                     val downloaded = vDownloaded.get() + aDownloaded.get()
                     val total = vTotal.get() + aTotal.get()
@@ -374,40 +374,92 @@ object FileDownloader {
             val aMuxIdx = muxer.addTrack(aFormat)
             muxer.start()
 
-            val maxBufferSize = 1024 * 1024 // 1 MB buffer
-            val buffer = ByteBuffer.allocate(maxBufferSize)
+            val buffer = ByteBuffer.allocateDirect(1024 * 1024)
             val bufferInfo = MediaCodec.BufferInfo()
+
+            var lastVTime = -1L
+            var lastATime = -1L
+            var vStartOffset = -1L
+            var aStartOffset = -1L
+
+            var videoSampleCount = 0
+            var audioSampleCount = 0
 
             var videoDone = false
             var audioDone = false
 
             while (!videoDone || !audioDone) {
-                val vTime = if (!videoDone) vExtractor.sampleTime else Long.MAX_VALUE
-                val aTime = if (!audioDone) aExtractor.sampleTime else Long.MAX_VALUE
+                val vRawTime = if (!videoDone) vExtractor.sampleTime else Long.MAX_VALUE
+                val aRawTime = if (!audioDone) aExtractor.sampleTime else Long.MAX_VALUE
 
-                if (!videoDone && (audioDone || vTime <= aTime)) {
-                    bufferInfo.offset = 0
-                    bufferInfo.size = vExtractor.readSampleData(buffer, 0)
-                    if (bufferInfo.size < 0) {
+                if (vRawTime < 0) videoDone = true
+                if (aRawTime < 0) audioDone = true
+
+                if (videoDone && audioDone) break
+
+                if (!videoDone && (audioDone || vRawTime <= aRawTime)) {
+                    buffer.clear()
+                    val sampleSize = vExtractor.readSampleData(buffer, 0)
+                    if (sampleSize < 0) {
                         videoDone = true
                     } else {
-                        bufferInfo.presentationTimeUs = vExtractor.sampleTime
-                        bufferInfo.flags = vExtractor.sampleFlags
+                        if (vStartOffset < 0) vStartOffset = vRawTime
+                        var pts = vRawTime - vStartOffset
+                        if (pts <= lastVTime) {
+                            pts = lastVTime + 1000L
+                        }
+                        lastVTime = pts
+
+                        bufferInfo.offset = 0
+                        bufferInfo.size = sampleSize
+                        bufferInfo.presentationTimeUs = pts
+                        bufferInfo.flags = if ((vExtractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) {
+                            MediaCodec.BUFFER_FLAG_KEY_FRAME
+                        } else {
+                            0
+                        }
+
+                        buffer.position(0)
+                        buffer.limit(sampleSize)
+
                         muxer.writeSampleData(vMuxIdx, buffer, bufferInfo)
+                        videoSampleCount++
                         vExtractor.advance()
                     }
                 } else if (!audioDone) {
-                    bufferInfo.offset = 0
-                    bufferInfo.size = aExtractor.readSampleData(buffer, 0)
-                    if (bufferInfo.size < 0) {
+                    buffer.clear()
+                    val sampleSize = aExtractor.readSampleData(buffer, 0)
+                    if (sampleSize < 0) {
                         audioDone = true
                     } else {
-                        bufferInfo.presentationTimeUs = aExtractor.sampleTime
-                        bufferInfo.flags = aExtractor.sampleFlags
+                        if (aStartOffset < 0) aStartOffset = aRawTime
+                        var pts = aRawTime - aStartOffset
+                        if (pts <= lastATime) {
+                            pts = lastATime + 1000L
+                        }
+                        lastATime = pts
+
+                        bufferInfo.offset = 0
+                        bufferInfo.size = sampleSize
+                        bufferInfo.presentationTimeUs = pts
+                        bufferInfo.flags = if ((aExtractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) {
+                            MediaCodec.BUFFER_FLAG_KEY_FRAME
+                        } else {
+                            0
+                        }
+
+                        buffer.position(0)
+                        buffer.limit(sampleSize)
+
                         muxer.writeSampleData(aMuxIdx, buffer, bufferInfo)
+                        audioSampleCount++
                         aExtractor.advance()
                     }
                 }
+            }
+
+            if (videoSampleCount == 0 || audioSampleCount == 0) {
+                return false to "Veri okunamadı (Video: $videoSampleCount, Ses: $audioSampleCount)"
             }
 
             muxer.stop()
