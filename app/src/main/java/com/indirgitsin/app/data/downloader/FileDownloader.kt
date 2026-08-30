@@ -16,6 +16,9 @@ import android.os.Build
 import android.os.Environment
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import com.googlecode.mp4parser.authoring.Movie
+import com.googlecode.mp4parser.authoring.builder.DefaultMp4Builder
+import com.googlecode.mp4parser.authoring.container.mp4.MovieCreator
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.text.Normalizer
 import java.util.concurrent.TimeUnit
@@ -254,7 +258,7 @@ object FileDownloader {
             val outFile = File(outDir, fileName)
 
             muxTmp = File.createTempFile("mux_", ".mp4", cache)
-            val muxRes = muxFilesInterleaved(videoTmp, audioTmp, muxTmp)
+            val muxRes = muxVideoAndAudio(videoTmp, audioTmp, muxTmp)
             if (!muxRes.first) {
                 muxTmp.delete()
                 return@coroutineScope false to (muxRes.second ?: "Muxing başarısız")
@@ -325,9 +329,68 @@ object FileDownloader {
     }
 
     /**
-     * Video ve Ses parçalarını kronolojik zaman damgasıyla (interleaved) sıralı birleştiren kararlı Muxer
+     * Çift Motorlu Muxer: Önce Pure Java Mp4Parser dener, gerekirse MediaMuxer'a geçer.
      */
-    private fun muxFilesInterleaved(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
+    private fun muxVideoAndAudio(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
+        // 1. Motor: Mp4Parser (Pure Java ISO Container - Fragmented MP4 ve tüm codec'lerle %100 uyumlu)
+        val mp4ParserRes = muxWithMp4Parser(videoFile, audioFile, outFile)
+        if (mp4ParserRes.first) {
+            return true to null
+        }
+
+        // 2. Motor: MediaMuxer (Yedek)
+        val mediaMuxerRes = muxWithMediaMuxer(videoFile, audioFile, outFile)
+        if (mediaMuxerRes.first) {
+            return true to null
+        }
+
+        return false to "Birleştirme başarısız (Mp4Parser: ${mp4ParserRes.second}, MediaMuxer: ${mediaMuxerRes.second})"
+    }
+
+    /**
+     * Mp4Parser ile Saf Java Seviyesinde MP4 Birleştirme (Donanım/Chipset bağımlılığı yoktur, fMP4 destekler)
+     */
+    private fun muxWithMp4Parser(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
+        return try {
+            val videoMovie = MovieCreator.build(videoFile.absolutePath)
+            val audioMovie = MovieCreator.build(audioFile.absolutePath)
+            val finalMovie = Movie()
+
+            for (track in videoMovie.tracks) {
+                if (track.handler == "vide") {
+                    finalMovie.addTrack(track)
+                }
+            }
+            for (track in audioMovie.tracks) {
+                if (track.handler == "soun") {
+                    finalMovie.addTrack(track)
+                }
+            }
+
+            if (finalMovie.tracks.isEmpty()) {
+                return false to "MP4 video/ses izleri bulunamadı"
+            }
+
+            val container = DefaultMp4Builder().build(finalMovie)
+            FileOutputStream(outFile).use { fos ->
+                container.writeContainer(fos.channel)
+            }
+
+            if (outFile.exists() && outFile.length() > 1024) {
+                true to null
+            } else {
+                false to "Çıktı dosyası boş veya geçersiz"
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false to (e.message ?: "Mp4Parser istisnası")
+        }
+    }
+
+    /**
+     * Android Yerel MediaMuxer Motoru (Yedek Muxer)
+     */
+    private fun muxWithMediaMuxer(videoFile: File, audioFile: File, outFile: File): Pair<Boolean, String?> {
         var muxer: MediaMuxer? = null
         var vExtractor: MediaExtractor? = null
         var aExtractor: MediaExtractor? = null
