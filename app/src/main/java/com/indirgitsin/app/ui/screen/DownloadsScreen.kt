@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.navigation.NavController
+import com.indirgitsin.app.data.lang.t
+import com.indirgitsin.app.data.lang.tr
 import com.indirgitsin.app.ui.navigation.Screen
 import java.io.File
 import java.net.URLEncoder
@@ -58,6 +60,16 @@ fun DownloadsScreen(navController: NavController) {
     var files by remember { mutableStateOf<List<DownloadedFile>>(emptyList()) }
     var active by remember { mutableStateOf<List<ActiveDownload>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    val downloadsTitle = t("downloads_title")
+    val downloadsSubtitle = t("downloads_subtitle")
+    val refreshText = t("refresh")
+    val folderText = t("folder")
+    val openFolderText = t("open_folder")
+    val folderNotFoundText = t("folder_not_found")
+    val downloadingCountTemplate = t("downloading_count")
+    val cancelledTemplate = t("cancelled")
+    val emptyDownloadsTitle = t("empty_downloads_title")
+    val emptyDownloadsDesc = t("empty_downloads_desc")
 
     fun refresh() {
         loading = true
@@ -87,10 +99,10 @@ fun DownloadsScreen(navController: NavController) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("İndirilenler", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
-                Text("${files.size} dosya • İndirilenler klasörü", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(downloadsTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+                Text("${files.size} $downloadsSubtitle", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = { refresh() }) { Icon(Icons.Rounded.Refresh, contentDescription = "Yenile") }
+            IconButton(onClick = { refresh() }) { Icon(Icons.Rounded.Refresh, contentDescription = refreshText) }
             if (files.isNotEmpty()) {
                 IconButton(onClick = {
                     // Dosya yöneticisini aç
@@ -99,24 +111,26 @@ fun DownloadsScreen(navController: NavController) {
                             setDataAndType(Uri.parse(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString()), "resource/folder")
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
-                        context.startActivity(Intent.createChooser(intent, "Klasörü aç"))
+                        context.startActivity(Intent.createChooser(intent, openFolderText))
                     } catch (_: Exception) {
-                        Toast.makeText(context, "Dosya yöneticisi bulunamadı", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, folderNotFoundText, Toast.LENGTH_SHORT).show()
                     }
-                }) { Icon(Icons.Rounded.FolderOpen, contentDescription = "Klasör") }
+                }) { Icon(Icons.Rounded.FolderOpen, contentDescription = folderText) }
             }
         }
 
         // Aktif indirmeler - en ustte, Spotify tarzı
         if (active.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("İndiriliyor • ${active.size} dosya", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                val downloadingCountText = try { String.format(downloadingCountTemplate, active.size) } catch (_: Exception) { downloadingCountTemplate }
+                Text(downloadingCountText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 active.forEach { item ->
                     ActiveDownloadCard(item, onCancel = {
                         try {
                             val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
                             dm.remove(item.id)
-                            Toast.makeText(context, "İptal edildi: ${item.name}", Toast.LENGTH_SHORT).show()
+                            val msg = try { String.format(cancelledTemplate, item.name) } catch (_: Exception) { cancelledTemplate }
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         } catch (_: Exception) {}
                         val an = scanActiveDownloads(context)
                         active = an
@@ -138,9 +152,9 @@ fun DownloadsScreen(navController: NavController) {
                             Icon(Icons.Rounded.DownloadDone, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
                         }
                     }
-                    Text("Henüz indirme yok", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text("YouTube linkini yapıştırıp bir kalite seçtiğinde dosyalar buraya gelecek.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick = { refresh() }, shape = RoundedCornerShape(20.dp)) { Text("Yenile") }
+                    Text(emptyDownloadsTitle, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(emptyDownloadsDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = { refresh() }, shape = RoundedCornerShape(20.dp)) { Text(refreshText) }
                 }
             }
         } else {
@@ -167,9 +181,9 @@ private fun DownloadCard(item: DownloadedFile, onPlay: () -> Unit, onShare: () -
     val isAudioExt = ext == "M4A" || ext == "MP3" || ext == "OPUS" || ext == "AAC" || ext == "FLAC"
     val isVideo = !isAudioExt && (item.mimeType.startsWith("video") || item.name.endsWith(".mp4", true) || item.name.endsWith(".webm", true) || item.name.endsWith(".mkv", true))
     val typeLabel = when {
-        isAudioExt -> "SES"
-        isVideo -> "VİDEO"
-        else -> "DOSYA"
+        isAudioExt -> t("type_audio")
+        isVideo -> t("type_video")
+        else -> t("type_file")
     }
     val typeColor = if (isVideo) MaterialTheme.colorScheme.primary else Color(0xFF0F9D58)
     val qualityFromName = Regex("_(\\d{3,4}p|\\d+kbps|\\d+k)_?").find(item.name)?.groupValues?.getOrNull(1)?.uppercase() ?: ""
@@ -204,9 +218,9 @@ private fun DownloadCard(item: DownloadedFile, onPlay: () -> Unit, onShare: () -
                 }
                 Text("$sizeText • $dateText", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, contentDescription = "Oynat", tint = MaterialTheme.colorScheme.primary) }
-            IconButton(onClick = onShare) { Icon(Icons.Rounded.Share, contentDescription = "Paylaş") }
-            IconButton(onClick = onDelete) { Icon(Icons.Rounded.Delete, contentDescription = "Sil", tint = MaterialTheme.colorScheme.error) }
+            IconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, contentDescription = t("play"), tint = MaterialTheme.colorScheme.primary) }
+            IconButton(onClick = onShare) { Icon(Icons.Rounded.Share, contentDescription = t("share")) }
+            IconButton(onClick = onDelete) { Icon(Icons.Rounded.Delete, contentDescription = t("delete"), tint = MaterialTheme.colorScheme.error) }
         }
     }
 }
@@ -276,7 +290,9 @@ private fun scanActiveDownloads(context: Context): List<ActiveDownload> {
             val statusIdx = c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS)
             while (c.moveToNext()) {
                 val id = c.getLong(idIdx)
-                val name = c.getString(titleIdx) ?: "İndiriliyor"
+                val lang = Locale.getDefault().language
+                val fallback = tr(lang, "downloading")
+                val name = c.getString(titleIdx) ?: fallback
                 val dl = c.getLong(bytesIdx)
                 val total = c.getLong(totalIdx)
                 val status = c.getInt(statusIdx)
@@ -291,10 +307,10 @@ private fun scanActiveDownloads(context: Context): List<ActiveDownload> {
 private fun ActiveDownloadCard(item: ActiveDownload, onCancel: () -> Unit) {
     val progress = if (item.totalBytes > 0) item.bytesDownloaded.toFloat() / item.totalBytes else 0f
     val statusText = when (item.status) {
-        android.app.DownloadManager.STATUS_RUNNING -> "İndiriliyor"
-        android.app.DownloadManager.STATUS_PAUSED -> "Duraklatıldı"
-        android.app.DownloadManager.STATUS_PENDING -> "Beklemede"
-        else -> "İşleniyor"
+        android.app.DownloadManager.STATUS_RUNNING -> t("status_running")
+        android.app.DownloadManager.STATUS_PAUSED -> t("status_paused")
+        android.app.DownloadManager.STATUS_PENDING -> t("status_pending")
+        else -> t("status_processing")
     }
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -306,7 +322,7 @@ private fun ActiveDownloadCard(item: ActiveDownload, onCancel: () -> Unit) {
                     Text("$statusText • ${formatSize(item.bytesDownloaded)} / ${if (item.totalBytes>0) formatSize(item.totalBytes) else "?"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
                 }
                 Text("${(progress*100).toInt()}%", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
-                IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = "İptal", tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+                IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = t("cancel"), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
             }
             LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)))
         }
@@ -314,6 +330,7 @@ private fun ActiveDownloadCard(item: ActiveDownload, onCancel: () -> Unit) {
 }
 
 private fun playFile(context: Context, item: DownloadedFile) {
+    val lang = Locale.getDefault().language
     try {
         val uri = if (item.file != null) {
             try { FileProvider.getUriForFile(context, "${context.packageName}.provider", item.file) } catch (_: Exception) { item.uri }
@@ -322,15 +339,16 @@ private fun playFile(context: Context, item: DownloadedFile) {
             setDataAndType(uri, item.mimeType)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(Intent.createChooser(intent, "Oynat: ${item.name}"))
+        context.startActivity(Intent.createChooser(intent, tr(lang, "play_title", item.name)))
     } catch (e: ActivityNotFoundException) {
-        Toast.makeText(context, "Oynatıcı bulunamadı", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, tr(lang, "no_player"), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
-        Toast.makeText(context, "Açılamadı: ${e.message}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, tr(lang, "open_failed", e.message ?: ""), Toast.LENGTH_SHORT).show()
     }
 }
 
 private fun shareFile(context: Context, item: DownloadedFile) {
+    val lang = Locale.getDefault().language
     try {
         val uri = if (item.file != null) {
             try { FileProvider.getUriForFile(context, "${context.packageName}.provider", item.file) } catch (_: Exception) { item.uri }
@@ -340,22 +358,23 @@ private fun shareFile(context: Context, item: DownloadedFile) {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, "Paylaş: ${item.name}"))
+        context.startActivity(Intent.createChooser(intent, tr(lang, "share_title", item.name)))
     } catch (e: Exception) {
-        Toast.makeText(context, "Paylaşılamadı: ${e.message}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, tr(lang, "share_failed", e.message ?: ""), Toast.LENGTH_SHORT).show()
     }
 }
 
 private fun deleteFile(context: Context, item: DownloadedFile) {
+    val lang = Locale.getDefault().language
     try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && item.file == null) {
             context.contentResolver.delete(item.uri, null, null)
         } else {
             item.file?.delete()
         }
-        Toast.makeText(context, "Silindi: ${item.name}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, tr(lang, "deleted", item.name), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
-        Toast.makeText(context, "Silinemedi: ${e.message}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, tr(lang, "delete_failed", e.message ?: ""), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -370,3 +389,5 @@ private fun formatSize(bytes: Long): String = when {
 private fun formatDate(millis: Long): String = try {
     SimpleDateFormat("dd MMM yyyy HH:mm", Locale("tr", "TR")).format(Date(millis))
 } catch (_: Exception) { "" }
+
+

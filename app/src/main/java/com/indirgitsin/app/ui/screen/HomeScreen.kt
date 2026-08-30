@@ -31,9 +31,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.indirgitsin.app.data.history.HistoryDao
+import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.UiState
 import com.indirgitsin.app.data.model.VideoInfo
+import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.ui.theme.YtRed
 import com.indirgitsin.app.util.YoutubeLinkHelper
 import kotlinx.coroutines.launch
@@ -149,11 +151,12 @@ fun HomeScreen(
             item {
                 Box(Modifier.padding(16.dp)) {
                     Text(
-                        "Sadece kendi içeriklerin veya izinli videolar için kullanın. YouTube Hizmet Şartlarına uyun.",
+                        t("tos_notice"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
             }
         }
     }
@@ -189,10 +192,10 @@ private fun YtTopBar() {
                     Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                 }
                 Spacer(Modifier.width(4.dp))
-                Text("İndir Gitsin", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(t("app_name"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(6.dp))
                 Surface(shape = RoundedCornerShape(4.dp), color = YtRed) {
-                    Text("  PREMIUM  ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                    Text("  ${t("premium")}  ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                 }
             }
             Spacer(Modifier.weight(1f))
@@ -215,11 +218,11 @@ private fun YtPremiumHero() {
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Premium • Hızlı • Güvenli", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleSmall)
-                Text("Saniyeler içinde indir, reklamsız izle", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
+                Text(t("premium_fast"), color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleSmall)
+                Text(t("premium_desc"), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
             }
             Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
-                Text(" PRO ", color = YtRed, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                Text(" ${t("pro")} ", color = YtRed, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
             }
         }
     }
@@ -228,10 +231,11 @@ private fun YtPremiumHero() {
 @Composable
 private fun YtPremiumBanner() {
     val context = LocalContext.current
+    val premiumToast = t("premium_toast")
     val gradient = Brush.horizontalGradient(listOf(Color(0xFFFF0000), Color(0xFFCC0000)))
     Box(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(12.dp)).background(gradient).clickable { android.widget.Toast.makeText(context, "İndirdiğin videoları reklamsız, offline ve arka planda oynat", android.widget.Toast.LENGTH_SHORT).show() }.padding(14.dp)
+            .clip(RoundedCornerShape(12.dp)).background(gradient).clickable { android.widget.Toast.makeText(context, premiumToast, android.widget.Toast.LENGTH_SHORT).show() }.padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Box(
@@ -242,8 +246,8 @@ private fun YtPremiumBanner() {
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Arka planda oynat • Reklamsız • İndir", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                Text("YouTube Music dahil • Tek dokunuşla indir", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
+                Text(t("premium_banner_title"), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(t("premium_banner_sub"), color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
             }
             Icon(Icons.Rounded.ArrowForward, null, tint = Color.White, modifier = Modifier.size(18.dp))
         }
@@ -273,7 +277,7 @@ private fun YtSearchBar(
                     value = inputUrl,
                     onValueChange = onInputChange,
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("YouTube linkini yapıştır", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    placeholder = { Text(t("search_hint"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.Transparent,
@@ -302,7 +306,7 @@ private fun YtSearchBar(
             ) {
                 Icon(Icons.Rounded.ContentPaste, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Yapıştır", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Text(t("paste"), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             }
             Button(
                 onClick = { onFetch(inputUrl) },
@@ -314,7 +318,7 @@ private fun YtSearchBar(
             ) {
                 Icon(Icons.Rounded.Bolt, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Çözümle", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                Text(t("resolve"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
             }
         }
     }
@@ -322,7 +326,7 @@ private fun YtSearchBar(
 
 @Composable
 private fun YtFilterChips(selectedChip: Int, onChipSelected: (Int) -> Unit) {
-    val chips = listOf("Tümü", "Video", "Music", "Shorts", "4K")
+    val chips = listOf(t("all"), t("video"), t("music"), t("shorts"), "4K")
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -382,7 +386,7 @@ private fun YtEmptyState() {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.OndemandVideo, null, tint = YtRed, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(10.dp))
-            Text("YouTube linkini yukarı yapıştır, kaliteler anında gelsin.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(t("empty_state"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -394,14 +398,14 @@ private fun YtRecentSection(historyDao: HistoryDao?, onHistoryClick: (String) ->
     LaunchedEffect(historyDao) { historyDao?.observeHistory()?.collect { recent = it.take(4) } }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("Tekrar izle", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(t("recent_title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             if (recent.isNotEmpty() && historyDao != null) {
-                TextButton(onClick = { scope.launch { historyDao.clearAll() } }) { Text("Temizle", style = MaterialTheme.typography.labelSmall) }
+                TextButton(onClick = { scope.launch { historyDao.clearAll() } }) { Text(t("clear"), style = MaterialTheme.typography.labelSmall) }
             }
         }
         if (recent.isEmpty()) {
-            Text("Çözümlediğin videolar burada görünecek.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(t("recent_empty"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 recent.forEach { item ->
@@ -435,11 +439,11 @@ private fun YtHistoryRow(item: com.indirgitsin.app.data.history.HistoryEntity, o
 @Composable
 private fun YtHowItWorks() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Nasıl indirilir?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(t("how_title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            YtStep("1", "Kopyala", Icons.Rounded.Link)
-            YtStep("2", "Paylaş", Icons.Rounded.Share)
-            YtStep("3", "İndir", Icons.Rounded.Download)
+            YtStep("1", t("step_copy"), Icons.Rounded.Link)
+            YtStep("2", t("step_share"), Icons.Rounded.Share)
+            YtStep("3", t("step_download"), Icons.Rounded.Download)
         }
     }
 }
@@ -491,7 +495,7 @@ private fun YtVideoCard(video: VideoInfo, onClick: () -> Unit) {
                     shape = RoundedCornerShape(4.dp),
                     color = YtRed
                 ) {
-                    Text(" ${video.streams.size} kalite ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
+                    Text(" ${video.streams.size} ${t("quality")} ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
                 }
             }
             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
@@ -505,13 +509,13 @@ private fun YtVideoCard(video: VideoInfo, onClick: () -> Unit) {
                     // YouTube chips
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                         Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                            Text(" 4K ", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
+                            Text(" ${t("badge_4k")} ", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
                         }
                         Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                             Row(Modifier.padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Rounded.AudioFile, null, modifier = Modifier.size(12.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("MP3", style = MaterialTheme.typography.labelSmall)
+                                Text(t("badge_mp3"), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -523,12 +527,12 @@ private fun YtVideoCard(video: VideoInfo, onClick: () -> Unit) {
                 FilledTonalButton(onClick = onClick, shape = RoundedCornerShape(20.dp), modifier = Modifier.weight(1f), contentPadding = PaddingValues(vertical = 10.dp)) {
                     Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("İndir", fontWeight = FontWeight.Bold)
+                    Text(t("download"), fontWeight = FontWeight.Bold)
                 }
                 OutlinedButton(onClick = onClick, shape = RoundedCornerShape(20.dp), modifier = Modifier.weight(1f), contentPadding = PaddingValues(vertical = 10.dp)) {
                     Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Önizle")
+                    Text(t("preview"))
                 }
             }
         }
@@ -577,18 +581,18 @@ private fun YtDownloadSheet(
             }
             // YouTube Premium style segmented
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(selected = selectedTab == 0, onClick = { onTabChange(0) }, shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp), icon = { Icon(Icons.Rounded.Videocam, null, modifier = Modifier.size(16.dp)) }) { Text("Video") }
-                SegmentedButton(selected = selectedTab == 1, onClick = { onTabChange(1) }, shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp), icon = { Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(16.dp)) }) { Text("Ses") }
+                SegmentedButton(selected = selectedTab == 0, onClick = { onTabChange(0) }, shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp), icon = { Icon(Icons.Rounded.Videocam, null, modifier = Modifier.size(16.dp)) }) { Text(t("video")) }
+                SegmentedButton(selected = selectedTab == 1, onClick = { onTabChange(1) }, shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp), icon = { Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(16.dp)) }) { Text(t("audio")) }
             }
             // Chip filtreleri: 0 Tümü (tab'a göre), 1 Video, 2 Music, 3 Shorts, 4 4K
             val baseByTab = if (selectedTab == 0) video.streams.filter { it.isVideo } else video.streams.filter { it.isAudioOnly }
             val (filtered, chipNote) = when (filterChip) {
                 1 -> baseByTab.filter { it.isVideo } to null
                 2 -> video.streams.filter { it.isAudioOnly } to null
-                3 -> if (video.durationSeconds in 1..65) baseByTab to null else emptyList<StreamOption>() to "Bu video Shorts değil • Süre ${YoutubeLinkHelper.formatDuration(video.durationSeconds)} (>60sn)"
+                3 -> if (video.durationSeconds in 1..65) baseByTab to null else emptyList<StreamOption>() to t("shorts_not", YoutubeLinkHelper.formatDuration(video.durationSeconds))
                 4 -> {
                     val fourK = baseByTab.filter { it.quality.contains("2160") || it.label.contains("2160") || it.quality.contains("1440") || it.label.contains("1440") || it.label.contains("4K", true) || it.quality.contains("4K", true) }
-                    fourK to if (fourK.isEmpty()) "Bu videoda 4K seçenek yok • En yüksek ${baseByTab.firstOrNull()?.quality ?: "—"}" else null
+                    fourK to if (fourK.isEmpty()) t("no_4k", baseByTab.firstOrNull()?.quality ?: "—") else null
                 }
                 else -> baseByTab to null
             }
@@ -600,20 +604,20 @@ private fun YtDownloadSheet(
             if (filtered.isEmpty() && chipNote == null) {
                 Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-                        Text("Bu filtrede seçenek yok", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(t("no_filter"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else if (filtered.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     filtered.forEach { opt ->
-                        YtOptionRow(label = opt.label, sublabel = "${opt.extension.uppercase()} • ${if (opt.isVideo) "Görüntü + Ses" else "Yalnız ses"}", isVideo = opt.isVideo, onClick = { onDownload(opt) })
+                        YtOptionRow(label = opt.label, sublabel = "${opt.extension.uppercase()} • ${if (opt.isVideo) t("sublabel_video") else t("sublabel_audio")}", isVideo = opt.isVideo, onClick = { onDownload(opt) })
                     }
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(Icons.Rounded.Folder, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("İndirilenler • Bildirimden takip et", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(t("downloads_hint"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -640,7 +644,7 @@ private fun YtOptionRow(label: String, sublabel: String, isVideo: Boolean, onCli
             FilledTonalButton(onClick = onClick, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.filledTonalButtonColors(containerColor = YtRed, contentColor = Color.White), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
                 Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("İndir", fontWeight = FontWeight.Bold)
+                Text(t("download"), fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -655,6 +659,13 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
     var addedCount by remember { mutableStateOf(0) }
     var currentProcessing by remember { mutableStateOf("") }
     val allSelected = selected.size == playlist.videos.size && playlist.videos.isNotEmpty()
+    val toastSelectFirst = t("toast_select_first")
+    val queueAddingTemplate = t("queue_adding")
+    val queueAddedText = t("queue_added")
+    val downloadingProgressTemplate = t("downloading_progress")
+    val gotoDownloadsText = t("goto_downloads")
+    val queueHintText = t("queue_hint")
+    val queueAddedCountTemplate = t("queue_added_count")
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -666,12 +677,12 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = allSelected, onClick = { selected = if (allSelected) emptySet() else playlist.videos.map { it.id }.toSet() }, label = { Text(if (allSelected) "Tümünü kaldır" else "Tümünü seç") })
+                FilterChip(selected = allSelected, onClick = { selected = if (allSelected) emptySet() else playlist.videos.map { it.id }.toSet() }, label = { Text(if (allSelected) t("deselect_all") else t("select_all")) })
                 Spacer(Modifier.weight(1f))
-                Text("${selected.size} seçili", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${selected.size} ${t("selected")}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (playlist.videos.isEmpty()) {
-                Text("Bu çalma listesinde video yok", style = MaterialTheme.typography.bodySmall)
+                Text(t("empty_playlist"), style = MaterialTheme.typography.bodySmall)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
                     playlist.videos.forEach { v ->
@@ -697,9 +708,9 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(v.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                                     if (isProcessing) {
-                                        Text("Kuyruğa ekleniyor...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(t("queue_adding"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     } else if (isDone) {
-                                        Text("Kuyruğa eklendi", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                        Text(t("queue_added"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
                                     } else {
                                         Text(v.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
@@ -712,7 +723,7 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
             Button(
                 onClick = {
                     if (selected.isEmpty()) {
-                        android.widget.Toast.makeText(context, "Önce video seç", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, toastSelectFirst, android.widget.Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     downloading = true
@@ -734,7 +745,8 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                         }
                         downloading = false
                         currentProcessing = ""
-                        android.widget.Toast.makeText(context, "$ok video kuyruğa eklendi • Bildirimden takip et", android.widget.Toast.LENGTH_LONG).show()
+                        val finalToast = try { String.format(queueAddedCountTemplate, ok) } catch (_: Exception) { queueAddedCountTemplate }
+                        android.widget.Toast.makeText(context, finalToast, android.widget.Toast.LENGTH_LONG).show()
                     }
                 },
                 enabled = selected.isNotEmpty() && !downloading,
@@ -751,9 +763,9 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                 Spacer(Modifier.width(8.dp))
                 Text(
                     when {
-                        downloading -> "Ekleniyor... ($addedCount/${selected.size})"
-                        addedCount > 0 -> "Eklendi ($addedCount) • İndirilenler'e git"
-                        else -> "Seçilenleri İndir (${selected.size})"
+                        downloading -> try { String.format(t("downloading_progress"), addedCount, selected.size) } catch (_: Exception) { t("downloading_progress") }
+                        addedCount > 0 -> try { String.format(t("added_count"), addedCount) } catch (_: Exception) { t("added_count") }
+                        else -> try { String.format(t("download_selected"), selected.size) } catch (_: Exception) { t("download_selected") }
                     },
                     fontWeight = FontWeight.Bold
                 )
@@ -765,11 +777,11 @@ private fun YtPlaylistCard(playlist: com.indirgitsin.app.data.model.PlaylistInfo
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("İndirilenler Sekmesine Git", fontWeight = FontWeight.Bold)
+                    Text(t("goto_downloads"), fontWeight = FontWeight.Bold)
                     Icon(Icons.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp))
                 }
             } else {
-                Text("Sırayla indirilir • İndirilenler'den takip et", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(t("queue_hint"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -784,7 +796,7 @@ private fun SmallCloseButton(onClick: () -> Unit, modifier: Modifier = Modifier)
         modifier = modifier.size(28.dp)
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Icon(Icons.Rounded.Close, contentDescription = "Kaldır", tint = Color.White, modifier = Modifier.size(16.dp))
+            Icon(Icons.Rounded.Close, contentDescription = t("remove"), tint = Color.White, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -813,3 +825,8 @@ private fun YtPreview() {
         )
     }
 }
+
+
+
+
+

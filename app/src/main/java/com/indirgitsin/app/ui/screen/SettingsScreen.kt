@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.indirgitsin.app.data.SettingsStore
+import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.data.history.AppDatabase
 import kotlinx.coroutines.launch
 
@@ -87,11 +88,11 @@ fun SettingsScreen() {
         // Tema secimi - acik/koyu/sistem
         PremiumSettingCard(
             icon = Icons.Rounded.DarkMode,
-            title = "Tema",
-            subtitle = when (theme) { "light" -> "Açık tema"; "dark" -> "Koyu tema"; else -> "Sistem teması" },
+            title = t("theme"),
+            subtitle = when (theme) { "light" -> t("theme_light"); "dark" -> t("theme_dark"); else -> t("theme_system") },
             action = {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf("light" to "Açık", "dark" to "Koyu", "system" to "Sistem").forEach { (v, label) ->
+                    listOf("light" to t("light"), "dark" to t("dark"), "system" to t("system")).forEach { (v, label) ->
                         val selected = theme == v
                         FilterChip(
                             selected = selected,
@@ -339,3 +340,4 @@ private fun PremiumSettingCard(
         }
     }
 }
+
