@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.indirgitsin.app.data.history.HistoryDao
 import com.indirgitsin.app.data.history.HistoryEntity
+import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.util.YoutubeLinkHelper
 import kotlinx.coroutines.launch
 
@@ -40,14 +41,14 @@ fun HistoryScreen(
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Geçmiş", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
-                Text("${history.size} video • Gizli, cihazında saklanır", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(t("history_title"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+                Text(t("history_sub", history.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (history.isNotEmpty()) {
                 TextButton(onClick = { scope.launch { historyDao.clearAll() } }) {
                     Icon(Icons.Rounded.DeleteSweep, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Temizle")
+                    Text(t("clear"))
                 }
             }
         }
@@ -62,8 +63,8 @@ fun HistoryScreen(
                             Icon(Icons.Rounded.History, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
                         }
                     }
-                    Text("Henüz geçmiş yok", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text("İndirdiğin veya çözümlediğin videolar burada görünecek. Tek dokunuşla tekrar indir.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(t("no_history"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(t("no_history_desc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
@@ -101,7 +102,7 @@ private fun HistoryCard(item: HistoryEntity, onClick: () -> Unit, onDelete: () -
                         Text(YoutubeLinkHelper.formatDuration(item.durationSeconds), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                     if (item.lastQuality != null) {
-                        Text("Son: ${item.lastQuality}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(t("last_quality", item.lastQuality!!), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

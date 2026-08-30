@@ -29,23 +29,21 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.history.AppDatabase
+import com.indirgitsin.app.data.lang.t
+import com.indirgitsin.app.data.lang.tr
 import com.indirgitsin.app.ui.navigation.AppNavHost
 import com.indirgitsin.app.ui.navigation.Screen
 import com.indirgitsin.app.ui.theme.IndirGitsinTheme
+import com.indirgitsin.app.util.UpdateChecker
 import com.indirgitsin.app.util.YoutubeLinkHelper
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class BottomItem(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector)
 
 class MainActivity : ComponentActivity() {
 
     private val vm: HomeViewModel by viewModels()
-    private val bottomItems = listOf(
-        BottomItem(Screen.Home.route, "Ana Sayfa", Icons.Rounded.Home, Icons.Rounded.Home),
-        BottomItem(Screen.History.route, "Kitaplık", Icons.Rounded.VideoLibrary, Icons.Rounded.VideoLibrary),
-        BottomItem(Screen.Downloads.route, "İndirilenler", Icons.Rounded.Download, Icons.Rounded.DownloadDone),
-        BottomItem(Screen.Settings.route, "Ayarlar", Icons.Rounded.Settings, Icons.Rounded.Settings)
-    )
 
     private val requestNotifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
@@ -73,6 +71,12 @@ class MainActivity : ComponentActivity() {
             val isDark = when (themePref) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
             androidx.compose.runtime.CompositionLocalProvider(com.indirgitsin.app.data.lang.LocalAppLanguage provides lang) {
             IndirGitsinTheme(darkTheme = isDark, appColor = appColor) {
+                val bottomItems = listOf(
+                    BottomItem(Screen.Home.route, t("home"), Icons.Rounded.Home, Icons.Rounded.Home),
+                    BottomItem(Screen.History.route, t("library"), Icons.Rounded.VideoLibrary, Icons.Rounded.VideoLibrary),
+                    BottomItem(Screen.Downloads.route, t("downloads"), Icons.Rounded.Download, Icons.Rounded.DownloadDone),
+                    BottomItem(Screen.Settings.route, t("settings"), Icons.Rounded.Settings, Icons.Rounded.Settings)
+                )
                 val navController = rememberNavController()
                 val backStack by navController.currentBackStackEntryAsState()
                 val currentRoute = backStack?.destination?.route
@@ -84,15 +88,15 @@ class MainActivity : ComponentActivity() {
                 if (updateInfo != null) {
                     AlertDialog(
                         onDismissRequest = { updateInfo = null },
-                        title = { Text("Güncelleme var: ${updateInfo!!.latestTag}") },
-                        text = { Text(updateInfo!!.body.take(300).ifBlank { "Yeni sürüm mevcut. Güncellemek ister misin?" }) },
+                        title = { Text(t("update_check_title", updateInfo!!.latestTag)) },
+                        text = { Text(updateInfo!!.body.take(300).ifBlank { t("update_check_body") }) },
                         confirmButton = {
                             TextButton(onClick = {
                                 com.indirgitsin.app.util.UpdateChecker.openUpdatePage(this@MainActivity, updateInfo!!)
                                 updateInfo = null
-                            }) { Text("Güncelle") }
+                            }) { Text(t("update_btn")) }
                         },
-                        dismissButton = { TextButton(onClick = { updateInfo = null }) { Text("Sonra") } }
+                        dismissButton = { TextButton(onClick = { updateInfo = null }) { Text(t("later")) } }
                     )
                 }
 
@@ -147,9 +151,9 @@ class MainActivity : ComponentActivity() {
                                         } catch (_: Exception) {}
                                     }
                                     com.indirgitsin.app.data.downloader.FileDownloader.enqueue(this@MainActivity, video, option)
-                                    Toast.makeText(this@MainActivity, "İndirme başlatıldı: ${option.label}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, tr(lang, "download_started", option.label), Toast.LENGTH_SHORT).show()
                                 } catch (e: Exception) {
-                                    Toast.makeText(this@MainActivity, "İndirme hatası: ${e.message}", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, tr(lang, "download_error", e.message ?: ""), Toast.LENGTH_LONG).show()
                                 }
                             }
                         )

@@ -42,15 +42,15 @@ fun SettingsScreen() {
     val appColor by SettingsStore.appColorFlow(context).collectAsState(initial = "red")
     val language by SettingsStore.languageFlow(context).collectAsState(initial = "tr")
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(if (language=="en") "Settings" else "Ayarlar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
-        Text(if (language=="en") "Premium experience • YouTube & Spotify style" else "Premium deneyim • YouTube & Spotify tarzı", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(t("settings"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+        Text(t("premium_exp"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         // Dil seçimi - modüler
         PremiumSettingCard(
             icon = Icons.Rounded.Language,
-            title = if (language=="en") "Language" else "Dil",
-            subtitle = if (language=="en") "App language" else "Uygulama dili",
+            title = t("language"),
+            subtitle = t("language_sub"),
             action = {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     com.indirgitsin.app.data.lang.AppStrings.supported.forEach { (code, label) ->
@@ -64,8 +64,8 @@ fun SettingsScreen() {
         // Renk seçimi
         PremiumSettingCard(
             icon = Icons.Rounded.Palette,
-            title = if (language=="en") "Color" else "Renk",
-            subtitle = if (language=="en") "Interface accent" else "Arayüz vurgu rengi",
+            title = t("color"),
+            subtitle = t("color_sub"),
             action = {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     com.indirgitsin.app.ui.theme.AppColor.entries.forEach { ac ->
@@ -107,8 +107,8 @@ fun SettingsScreen() {
 
         PremiumSettingCard(
             icon = Icons.Rounded.Folder,
-            title = "İndirme Konumu",
-            subtitle = "İndirilenler • /Download/$downloadFolder",
+            title = t("download_location"),
+            subtitle = t("download_location_sub", downloadFolder),
             action = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = {
@@ -120,24 +120,24 @@ fun SettingsScreen() {
                                 setDataAndType(uri, "resource/folder")
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(Intent.createChooser(intent, "Klasörü aç"))
+                            context.startActivity(Intent.createChooser(intent, t("open_folder")))
                         } catch (e: Exception) {
                             Toast.makeText(context, "/Download/$downloadFolder", Toast.LENGTH_SHORT).show()
                         }
-                    }) { Text("Aç", fontWeight = FontWeight.Bold) }
-                    TextButton(onClick = { folderInput = downloadFolder; showFolderDialog = true }) { Text("Değiştir", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
+                    }) { Text(t("open"), fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = { folderInput = downloadFolder; showFolderDialog = true }) { Text(t("change"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
                 }
             }
         )
         if (showFolderDialog) {
             AlertDialog(
                 onDismissRequest = { showFolderDialog = false },
-                title = { Text("Klasör Seç") },
+                title = { Text(t("folder_choose_title")) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("İndirilenler altında oluşturulacak klasör adı:", style = MaterialTheme.typography.bodySmall)
+                        Text(t("folder_choose_desc"), style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(value = folderInput, onValueChange = { folderInput = it }, singleLine = true, placeholder = { Text("IndirGitsin") })
-                        Text("Örn: IndirGitsin, Muzikler, Videolar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(t("folder_example"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 confirmButton = {
@@ -145,49 +145,49 @@ fun SettingsScreen() {
                         scope.launch {
                             val clean = folderInput.take(30).replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "IndirGitsin" }
                             SettingsStore.setDownloadSubfolder(context, clean)
-                            Toast.makeText(context, "Klasör: /Download/$clean", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, t("folder_saved", clean), Toast.LENGTH_SHORT).show()
                         }
                         showFolderDialog = false
-                    }) { Text("Kaydet") }
+                    }) { Text(t("save")) }
                 },
-                dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text("İptal") } }
+                dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text(t("cancel")) } }
             )
         }
         if (manualUpdate != null) {
             AlertDialog(
                 onDismissRequest = { manualUpdate = null },
-                title = { Text("Güncelleme var: ${manualUpdate!!.latestTag}") },
-                text = { Text(manualUpdate!!.body.take(350).ifBlank { "Yeni sürüm mevcut." }) },
+                title = { Text(t("update_check_title", manualUpdate!!.latestTag)) },
+                text = { Text(manualUpdate!!.body.take(350).ifBlank { t("no_update_body") }) },
                 confirmButton = {
                     TextButton(onClick = {
                         com.indirgitsin.app.util.UpdateChecker.openUpdatePage(context, manualUpdate!!)
                         manualUpdate = null
-                    }) { Text("Güncelle") }
+                    }) { Text(t("update_btn")) }
                 },
-                dismissButton = { TextButton(onClick = { manualUpdate = null }) { Text("Kapat") } }
+                dismissButton = { TextButton(onClick = { manualUpdate = null }) { Text(t("close")) } }
             )
         }
         PremiumSettingCard(
             icon = Icons.Rounded.HighQuality,
-            title = "Varsayılan Kalite",
-            subtitle = if (autoHigh) "En yüksek kaliteyi otomatik seç" else "Her seferinde sor",
+            title = t("default_quality"),
+            subtitle = if (autoHigh) t("auto_high_on") else t("auto_high_off"),
             action = {
                 Switch(checked = autoHigh, onCheckedChange = { v ->
                     scope.launch { SettingsStore.setAutoHigh(context, v) }
-                    Toast.makeText(context, if (v) "Otomatik yüksek kalite" else "Manuel seçim", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, if (v) t("auto_high_toast_on") else t("auto_high_toast_off"), Toast.LENGTH_SHORT).show()
                 })
             }
         )
         PremiumSettingCard(
             icon = Icons.Rounded.AudioFile,
-            title = "Ses Formatı",
-            subtitle = "Varsayılan ses çıkışı: $audioFormat",
+            title = t("audio_format"),
+            subtitle = t("audio_format_sub", audioFormat),
             action = {
                 Surface(
                     onClick = {
                         val next = when (audioFormat) { "M4A" -> "MP3"; "MP3" -> "WEBM"; else -> "M4A" }
                         scope.launch { SettingsStore.setAudioFormat(context, next) }
-                        Toast.makeText(context, "Ses formatı: $next", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, t("audio_format_toast", next), Toast.LENGTH_SHORT).show()
                     },
                     shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary
                 ) { Text(" $audioFormat ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
@@ -195,26 +195,26 @@ fun SettingsScreen() {
         )
         PremiumSettingCard(
             icon = Icons.Rounded.Shield,
-            title = "Gizlilik",
-            subtitle = "Geçmiş sadece cihazında saklanır • 0 iz",
+            title = t("privacy"),
+            subtitle = t("privacy_sub"),
             action = {
                 TextButton(onClick = {
                     scope.launch {
                         try {
                             val db = AppDatabase.get(context)
                             db.historyDao().clearAll()
-                            Toast.makeText(context, "Geçmiş temizlendi", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, t("history_cleared"), Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
-                            Toast.makeText(context, "Gizlilik: veriler cihazında kalır", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, t("privacy_stays"), Toast.LENGTH_SHORT).show()
                         }
                     }
-                }) { Text("Temizle", fontWeight = FontWeight.Bold) }
+                }) { Text(t("clear"), fontWeight = FontWeight.Bold) }
             }
         )
         PremiumSettingCard(
             icon = Icons.Rounded.SystemUpdate,
-            title = "Güncelleme",
-            subtitle = "v$version • GitHub'dan denetle",
+            title = t("update"),
+            subtitle = t("update_sub", version),
             action = {
                 if (checking) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 else TextButton(onClick = {
@@ -222,9 +222,9 @@ fun SettingsScreen() {
                     scope.launch {
                         val info = com.indirgitsin.app.util.UpdateChecker.check(context)
                         checking = false
-                        if (info != null) manualUpdate = info else Toast.makeText(context, "En güncel sürümdesin • v$version", Toast.LENGTH_SHORT).show()
+                        if (info != null) manualUpdate = info else Toast.makeText(context, t("latest_version", version), Toast.LENGTH_SHORT).show()
                     }
-                }) { Text("Denetle", fontWeight = FontWeight.Bold) }
+                }) { Text(t("check"), fontWeight = FontWeight.Bold) }
             }
         )
 
@@ -234,12 +234,12 @@ fun SettingsScreen() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Info, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
-                    Text("Program Hakkında", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Text(t("about"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.weight(1f))
                     Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary) { Text(" v$version ", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), color = Color.White, style = MaterialTheme.typography.labelSmall) }
                 }
                 Text(
-                    "İndir Gitsin — YouTube ve YouTube Music linklerinden video ve sesleri cihazına hızlıca indir. Gizlilik odaklı, reklamsız, tek dokunuşla. İndirilenler cihazında kalır, iz bırakmaz.",
+                    t("about_desc"),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Button(
@@ -257,7 +257,7 @@ fun SettingsScreen() {
                 ) {
                     Icon(Icons.Rounded.OpenInNew, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("github.com/eekilinc/indirgitsin", fontWeight = FontWeight.Bold)
+                    Text(t("source_code"), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -282,25 +282,25 @@ fun SettingsScreen() {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Kaynak Kod", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                    Text("github.com/eekilinc/indirgitsin • Açık kaynak", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(t("source_code"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    Text(t("source_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(Icons.Rounded.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         PremiumSettingCard(
             icon = Icons.Rounded.Info,
-            title = "Lisans",
-            subtitle = "MIT • Sadece izinli içerikler için kullanın",
+            title = t("license"),
+            subtitle = t("license_sub"),
             action = {
                 TextButton(onClick = {
                     try {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eekilinc/indirgitsin/blob/main/LICENSE"))
                         context.startActivity(intent)
                     } catch (_: Exception) {
-                        Toast.makeText(context, "MIT Lisansı", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, t("mit"), Toast.LENGTH_SHORT).show()
                     }
-                }) { Text("Gör", fontWeight = FontWeight.Bold) }
+                }) { Text(t("see"), fontWeight = FontWeight.Bold) }
             }
         )
 
@@ -309,8 +309,8 @@ fun SettingsScreen() {
                 Icon(Icons.Rounded.Info, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("İndir Gitsin v$version", fontWeight = FontWeight.Bold)
-                    Text("Sadece izinli içerikler için kullanın. YouTube ToS'a uyun.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(t("copyright", version), fontWeight = FontWeight.Bold)
+                    Text(t("copyright_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
