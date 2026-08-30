@@ -32,6 +32,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
+import androidx.navigation.compose.BackHandler
 import androidx.navigation.compose.popBackStack
 import kotlinx.coroutines.delay
 
