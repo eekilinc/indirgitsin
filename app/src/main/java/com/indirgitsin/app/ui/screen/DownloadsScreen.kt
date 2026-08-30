@@ -356,11 +356,8 @@ private fun scanDownloads(context: Context): List<DownloadedFile> {
                 MediaStore.Downloads.SIZE,
                 MediaStore.Downloads.DATE_MODIFIED,
                 MediaStore.Downloads.MIME_TYPE,
-                MediaStore.Downloads._ID,
-                MediaStore.Downloads.RELATIVE_PATH
+                MediaStore.Downloads._ID
             )
-            // RELATIVE_PATH filtresi cihazdan cihaza değişiyor (Download/IndirGitsin vs Download), bu yüzden geniş tut
-            // Önce MediaStore dene
             try {
                 context.contentResolver.query(
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI,
@@ -383,44 +380,14 @@ private fun scanDownloads(context: Context): List<DownloadedFile> {
                     }
                 }
             } catch (_: Exception) {}
-            // Fallback: doğrudan File API ile Download/IndirGitsin ve Download kökü tara (MediaStore RELATIVE_PATH setDestinationInExternalPublicDir ile bozulabiliyor)
-            try {
-                @Suppress("DEPRECATION")
-                val downloadRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                val dirsToScan = listOf(downloadRoot, File(downloadRoot, "IndirGitsin")) + try {
-                    val sub = SettingsStore::class.java // dummy to avoid unused import
-                    emptyList<File>()
-                } catch (_: Exception) { emptyList() }
-                // Ayrıca SettingsStore subfolder'ını da tara
-                val extraDirs = mutableListOf<File>()
-                try {
-                    // subfolder adını SettingsStore'dan oku (suspend değil, direkt file list)
-                    val customDirs = downloadRoot.listFiles()?.filter { it.isDirectory } ?: emptyList()
-                    extraDirs.addAll(customDirs)
-                } catch (_: Exception) {}
-                val allDirs = (dirsToScan + extraDirs).distinctBy { it.absolutePath }
-                for (dir in allDirs) {
-                    if (!dir.exists() || !dir.isDirectory) continue
-                    dir.listFiles()?.forEach { f ->
-                        if (!f.isFile) return@forEach
-                        if (!f.name.endsWith(".mp4", true) && !f.name.endsWith(".m4a", true) && !f.name.endsWith(".mp3", true) && !f.name.endsWith(".webm", true) && !f.name.endsWith(".mkv", true)) return@forEach
-                        if (result.any { it.name == f.name }) return@forEach
-                        val mime = when {
-                            f.name.endsWith(".mp3", true) -> "audio/mpeg"
-                            f.name.endsWith(".m4a", true) -> "audio/mp4"
-                            f.name.endsWith(".webm", true) -> "video/webm"
-                            else -> "video/mp4"
-                        }
-                        result.add(DownloadedFile(f.name, Uri.fromFile(f), f.length(), f.lastModified(), mime, f))
-                    }
-                }
-            } catch (_: Exception) {}
-            result.sortByDescending { it.dateMillis }
-        } else {
+        }
+
+        // File-based scanning fallback (IndirGitsin alt klasörü ve indirme kökü)
+        try {
             @Suppress("DEPRECATION")
             val downloadRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val dirs = listOf(downloadRoot, File(downloadRoot, "IndirGitsin")) + (downloadRoot.listFiles()?.filter { it.isDirectory } ?: emptyList())
-            for (dir in dirs.distinctBy { it.absolutePath }) {
+            val dirsToScan = listOf(downloadRoot, File(downloadRoot, "IndirGitsin")) + (downloadRoot.listFiles()?.filter { it.isDirectory } ?: emptyList())
+            for (dir in dirsToScan.distinctBy { it.absolutePath }) {
                 if (!dir.exists() || !dir.isDirectory) continue
                 dir.listFiles()?.sortedByDescending { it.lastModified() }?.forEach { f ->
                     if (f.isFile && (f.name.endsWith(".mp4", true) || f.name.endsWith(".m4a", true) || f.name.endsWith(".mp3", true) || f.name.endsWith(".webm", true) || f.name.endsWith(".mkv", true))) {
@@ -435,8 +402,9 @@ private fun scanDownloads(context: Context): List<DownloadedFile> {
                     }
                 }
             }
-            result.sortByDescending { it.dateMillis }
-        }
+        } catch (_: Exception) {}
+
+        result.sortByDescending { it.dateMillis }
     } catch (_: Exception) {}
     return result
 }
