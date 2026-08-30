@@ -419,6 +419,11 @@ object FileDownloader {
                 }
             }
 
+            val vWidth = if (vFormat.containsKey(MediaFormat.KEY_WIDTH)) vFormat.getInteger(MediaFormat.KEY_WIDTH) else 1920
+            val vHeight = if (vFormat.containsKey(MediaFormat.KEY_HEIGHT)) vFormat.getInteger(MediaFormat.KEY_HEIGHT) else 1080
+            val aSampleRate = if (aFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) aFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
+            val aChannelCount = if (aFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) aFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
+
             val vMedia3Format = Format.Builder()
                 .setSampleMimeType(vMime)
                 .setWidth(vWidth)
