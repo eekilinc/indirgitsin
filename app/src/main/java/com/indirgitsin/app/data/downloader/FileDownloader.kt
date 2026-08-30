@@ -19,20 +19,15 @@ import androidx.core.app.NotificationCompat
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.io.InputStream
-import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.text.Normalizer
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 object FileDownloader {
 
@@ -42,46 +37,89 @@ object FileDownloader {
         .retryOnConnectionFailure(true)
         .build()
 
+    private const val CHANNEL_ID = "indirgitsin_dl"
+
     fun enqueue(context: Context, video: VideoInfo, option: StreamOption) {
         val safeTitle = sanitizeFileName(video.title)
         val ext = option.extension.ifBlank { if (option.isAudioOnly) "m4a" else "mp4" }
         val qualityPart = option.quality.ifBlank { option.label.replace(" ", "_").take(20) }
         val fileName = "${safeTitle}_${qualityPart}.$ext"
 
-        // Güvenlik Ağı: Eğer video ise ve ses akışı ayrık ise, audioUrl'i garantiye al
+        // Güvenlik Ağı: Eğer video ise ve ses akışı ayrık ise, AAC ses akışını bağla
         val effectiveAudioUrl = option.audioUrl ?: if (option.isVideo && option.quality != "360p") {
             video.streams.filter { it.isAudioOnly && it.extension == "m4a" }.maxByOrNull { it.bitrate }?.url
                 ?: video.streams.filter { it.isAudioOnly }.maxByOrNull { it.bitrate }?.url
         } else null
 
-        // Mux gerektiren (video + ses birleştirme) indirme
+        // Mux gerektiren (Video + Ses) İndirme
         if (effectiveAudioUrl != null) {
+            val notificationId = (fileName + System.currentTimeMillis()).hashCode()
+            Toast.makeText(context, "İndirme başlatıldı: $fileName", Toast.LENGTH_SHORT).show()
+
             CoroutineScope(Dispatchers.Main).launch {
-                Toast.makeText(context, "İndiriliyor (Ses ve Video Birleştiriliyor): $fileName", Toast.LENGTH_SHORT).show()
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                createNotificationChannel(context, notificationManager)
+
+                val notifBuilder = NotificationCompat.Builder(context, CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.stat_sys_download)
+                    .setContentTitle("İndiriliyor: $fileName")
+                    .setContentText("Video ve ses indiriliyor...")
+                    .setProgress(100, 0, false)
+                    .setOngoing(true)
+                    .setOnlyAlertOnce(true)
+
+                notificationManager.notify(notificationId, notifBuilder.build())
+
                 val subfolder = try {
                     withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin"
                 } catch (_: Exception) { "IndirGitsin" }
 
                 val result = withContext(Dispatchers.IO) {
-                    downloadAndMuxWithReason(context, option.url, effectiveAudioUrl, subfolder, fileName)
+                    downloadAndMuxParallel(
+                        context = context,
+                        videoUrl = option.url,
+                        audioUrl = effectiveAudioUrl,
+                        subfolder = subfolder,
+                        fileName = fileName,
+                        onProgress = { progress, downloadedMB, totalMB ->
+                            notifBuilder.setProgress(100, progress, false)
+                            notifBuilder.setContentText("$progress% • ${String.format("%.1f", downloadedMB)} MB / ${String.format("%.1f", totalMB)} MB")
+                            notificationManager.notify(notificationId, notifBuilder.build())
+                        },
+                        onMuxing = {
+                            notifBuilder.setProgress(100, 99, true)
+                            notifBuilder.setContentText("Video ve ses birleştiriliyor...")
+                            notificationManager.notify(notificationId, notifBuilder.build())
+                        }
+                    )
                 }
 
                 if (result.first) {
-                    showNotification(context, fileName)
+                    val finalNotif = NotificationCompat.Builder(context, CHANNEL_ID)
+                        .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                        .setContentTitle("İndirme Tamamlandı")
+                        .setContentText(fileName)
+                        .setOngoing(false)
+                        .setAutoCancel(true)
+                    notificationManager.notify(notificationId, finalNotif.build())
                     Toast.makeText(context, "İndirme ve birleştirme tamamlandı: $fileName", Toast.LENGTH_SHORT).show()
                 } else {
                     val reason = result.second ?: "bilinmeyen hata"
-                    Toast.makeText(context, "Birleştirme hatası: $reason. Ayrı olarak indiriliyor.", Toast.LENGTH_LONG).show()
-                    val audioExt = "m4a"
-                    val audioName = fileName.substringBeforeLast(".") + "_ses.$audioExt"
-                    enqueueSingle(context, option.url, subfolder, fileName, option.label, false)
-                    enqueueSingle(context, effectiveAudioUrl, subfolder, audioName, "Ses • $audioExt", true)
+                    val errorNotif = NotificationCompat.Builder(context, CHANNEL_ID)
+                        .setSmallIcon(android.R.drawable.stat_notify_error)
+                        .setContentTitle("İndirme Başarısız")
+                        .setContentText(reason)
+                        .setOngoing(false)
+                        .setAutoCancel(true)
+                    notificationManager.notify(notificationId, errorNotif.build())
+                    Toast.makeText(context, "Hata: $reason", Toast.LENGTH_LONG).show()
                 }
             }
             return
         }
 
-        // Doğrudan tek dosya indirme (Ses dosyaları veya inherent muxed 360p)
+        // Doğrudan tek dosya indirme (Ses dosyaları veya inherent 360p)
+        Toast.makeText(context, "İndirme başlatıldı: $fileName", Toast.LENGTH_SHORT).show()
         CoroutineScope(Dispatchers.Main).launch {
             val subfolder = try {
                 withTimeoutOrNull(1500) { SettingsStore.downloadSubfolderFlow(context).first() } ?: "IndirGitsin"
@@ -123,7 +161,6 @@ object FileDownloader {
                 addRequestHeader("Accept", "*/*")
             }
             dm.enqueue(request)
-            Toast.makeText(context, "İndiriliyor: $fileName", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(context, "Hata: ${e.message}", Toast.LENGTH_LONG).show()
@@ -142,42 +179,92 @@ object FileDownloader {
         return if (result.length > 60) result.take(60).trim('_') else result
     }
 
-    private fun downloadAndMuxWithReason(context: Context, videoUrl: String, audioUrl: String, subfolder: String, fileName: String): Pair<Boolean, String?> {
+    private suspend fun downloadAndMuxParallel(
+        context: Context,
+        videoUrl: String,
+        audioUrl: String,
+        subfolder: String,
+        fileName: String,
+        onProgress: (Int, Float, Float) -> Unit,
+        onMuxing: () -> Unit
+    ): Pair<Boolean, String?> = coroutineScope {
         var videoTmp: File? = null
         var audioTmp: File? = null
         var muxTmp: File? = null
-        return try {
-            val cache = context.cacheDir
-            videoTmp = File.createTempFile("vid_", ".tmp", cache)
-            audioTmp = File.createTempFile("aud_", ".tmp", cache)
 
-            if (!downloadToFile(videoUrl, videoTmp)) {
-                return false to "Video akışı indirilemedi (Bağlantı/403)"
+        try {
+            val cache = context.cacheDir
+            videoTmp = File.createTempFile("vid_", ".mp4", cache)
+            audioTmp = File.createTempFile("aud_", ".m4a", cache)
+
+            val vDownloaded = AtomicLong(0L)
+            val aDownloaded = AtomicLong(0L)
+            val vTotal = AtomicLong(1L)
+            val aTotal = AtomicLong(1L)
+
+            var lastUpdate = 0L
+
+            fun updateProgress() {
+                val now = System.currentTimeMillis()
+                if (now - lastUpdate > 400) {
+                    lastUpdate = now
+                    val downloaded = vDownloaded.get() + aDownloaded.get()
+                    val total = vTotal.get() + aTotal.get()
+                    if (total > 0) {
+                        val pct = ((downloaded.toDouble() / total.toDouble()) * 100).toInt().coerceIn(0, 98)
+                        val downMB = downloaded / (1024f * 1024f)
+                        val totalMB = total / (1024f * 1024f)
+                        onProgress(pct, downMB, totalMB)
+                    }
+                }
             }
-            if (!downloadToFile(audioUrl, audioTmp)) {
-                return false to "Ses akışı indirilemedi (Bağlantı/403)"
+
+            // Video ve Sesi EŞ ZAMANLI (PARALEL) İNDİR
+            val videoDeferred = async(Dispatchers.IO) {
+                downloadToFileWithProgress(videoUrl, videoTmp) { bytesRead, totalBytes ->
+                    vDownloaded.set(bytesRead)
+                    if (totalBytes > 0) vTotal.set(totalBytes)
+                    updateProgress()
+                }
             }
+
+            val audioDeferred = async(Dispatchers.IO) {
+                downloadToFileWithProgress(audioUrl, audioTmp) { bytesRead, totalBytes ->
+                    aDownloaded.set(bytesRead)
+                    if (totalBytes > 0) aTotal.set(totalBytes)
+                    updateProgress()
+                }
+            }
+
+            val videoSuccess = videoDeferred.await()
+            val audioSuccess = audioDeferred.await()
+
+            if (!videoSuccess) return@coroutineScope false to "Video akışı indirilemedi"
+            if (!audioSuccess) return@coroutineScope false to "Ses akışı indirilemedi"
+
             if (videoTmp.length() < 1024 || audioTmp.length() < 1024) {
-                return false to "İndirilen dosyalar eksik veya boş"
+                return@coroutineScope false to "İndirilen dosyalar eksik veya boş"
             }
+
+            onMuxing()
 
             val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val outDir = File(downloadsDir, subfolder)
             if (!outDir.exists()) outDir.mkdirs()
             val outFile = File(outDir, fileName)
 
-            muxTmp = File.createTempFile("mux_", ".tmp", cache)
+            muxTmp = File.createTempFile("mux_", ".mp4", cache)
             val muxRes = muxFilesInterleaved(videoTmp, audioTmp, muxTmp)
             if (!muxRes.first) {
                 muxTmp.delete()
-                return false to (muxRes.second ?: "Muxing başarısız")
+                return@coroutineScope false to (muxRes.second ?: "Muxing başarısız")
             }
 
             if (outFile.exists()) outFile.delete()
             muxTmp.copyTo(outFile, overwrite = true)
             muxTmp.delete()
 
-            // Medya tarayıcısına bildir (Galeride ve oynatıcılarda hemen görünsün)
+            // Medya tarayıcısına kaydet
             try {
                 val scanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).apply {
                     data = Uri.fromFile(outFile)
@@ -196,12 +283,12 @@ object FileDownloader {
         }
     }
 
-    private fun downloadToFile(url: String, dest: File): Boolean {
+    private fun downloadToFileWithProgress(url: String, dest: File, onProgress: (Long, Long) -> Unit): Boolean {
         repeat(3) { attempt ->
             try {
                 val req = Request.Builder()
                     .url(url)
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                     .header("Accept", "*/*")
                     .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
                     .header("Referer", "https://www.youtube.com/")
@@ -213,12 +300,16 @@ object FileDownloader {
                         return@repeat
                     }
                     val body = resp.body ?: return@repeat
+                    val contentLength = body.contentLength()
                     dest.outputStream().use { outStream ->
                         body.byteStream().use { inStream ->
                             val buffer = ByteArray(64 * 1024)
-                            var read: Int
-                            while (inStream.read(buffer).also { read = it } != -1) {
-                                outStream.write(buffer, 0, read)
+                            var bytesRead: Int
+                            var totalRead = 0L
+                            while (inStream.read(buffer).also { bytesRead = it } != -1) {
+                                outStream.write(buffer, 0, bytesRead)
+                                totalRead += bytesRead
+                                onProgress(totalRead, contentLength)
                             }
                             outStream.flush()
                         }
@@ -248,7 +339,6 @@ object FileDownloader {
             if (vExtractor.trackCount == 0) return false to "Video izi bulunamadı"
             if (aExtractor.trackCount == 0) return false to "Ses izi bulunamadı"
 
-            // Video ve Ses kanallarını bul
             var vTrackIdx = -1
             var aTrackIdx = -1
 
@@ -284,7 +374,6 @@ object FileDownloader {
             val aMuxIdx = muxer.addTrack(aFormat)
             muxer.start()
 
-            // İki izi aynı anda kronolojik sıra ile yaz (Buffer out of order hatasını önler)
             val maxBufferSize = 1024 * 1024 // 1 MB buffer
             val buffer = ByteBuffer.allocate(maxBufferSize)
             val bufferInfo = MediaCodec.BufferInfo()
@@ -333,14 +422,20 @@ object FileDownloader {
         }
     }
 
-    private fun showNotification(context: Context, fileName: String) {
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "indirgitsin_dl"
+    private fun createNotificationChannel(context: Context, manager: NotificationManager) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "İndirmeler", NotificationManager.IMPORTANCE_HIGH)
+            val channel = NotificationChannel(CHANNEL_ID, "İndirmeler", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Dosya indirme bildirimleri"
+                setShowBadge(false)
+            }
             manager.createNotificationChannel(channel)
         }
-        val builder = NotificationCompat.Builder(context, channelId)
+    }
+
+    private fun showNotification(context: Context, fileName: String) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        createNotificationChannel(context, manager)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setContentTitle("İndirme Tamamlandı")
             .setContentText(fileName)
