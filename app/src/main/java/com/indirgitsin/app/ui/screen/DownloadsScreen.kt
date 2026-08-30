@@ -234,44 +234,86 @@ private fun scanDownloads(context: Context): List<DownloadedFile> {
                 MediaStore.Downloads.SIZE,
                 MediaStore.Downloads.DATE_MODIFIED,
                 MediaStore.Downloads.MIME_TYPE,
-                MediaStore.Downloads._ID
+                MediaStore.Downloads._ID,
+                MediaStore.Downloads.RELATIVE_PATH
             )
-            val selection = "${MediaStore.Downloads.RELATIVE_PATH} LIKE ?"
-            val args = arrayOf("%Download%")
-            context.contentResolver.query(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                projection, selection, args, "${MediaStore.Downloads.DATE_MODIFIED} DESC"
-            )?.use { cursor ->
-                val nameIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
-                val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
-                val dateIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
-                val mimeIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.MIME_TYPE)
-                val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
-                while (cursor.moveToNext()) {
-                    val name = cursor.getString(nameIdx) ?: continue
-                    if (!name.endsWith(".mp4", true) && !name.endsWith(".m4a", true) && !name.endsWith(".mp3", true) && !name.endsWith(".webm", true) && !name.endsWith(".mkv", true)) continue
-                    val size = cursor.getLong(sizeIdx)
-                    val dateSec = cursor.getLong(dateIdx)
-                    val mime = cursor.getString(mimeIdx) ?: "video/mp4"
-                    val id = cursor.getLong(idIdx)
-                    val uri = Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
-                    result.add(DownloadedFile(name, uri, size, dateSec * 1000, mime))
+            // RELATIVE_PATH filtresi cihazdan cihaza değişiyor (Download/IndirGitsin vs Download), bu yüzden geniş tut
+            // Önce MediaStore dene
+            try {
+                context.contentResolver.query(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    projection, null, null, "${MediaStore.Downloads.DATE_MODIFIED} DESC"
+                )?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
+                    val dateIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
+                    val mimeIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.MIME_TYPE)
+                    val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+                    while (cursor.moveToNext()) {
+                        val name = cursor.getString(nameIdx) ?: continue
+                        if (!name.endsWith(".mp4", true) && !name.endsWith(".m4a", true) && !name.endsWith(".mp3", true) && !name.endsWith(".webm", true) && !name.endsWith(".mkv", true)) continue
+                        val size = cursor.getLong(sizeIdx)
+                        val dateSec = cursor.getLong(dateIdx)
+                        val mime = cursor.getString(mimeIdx) ?: "video/mp4"
+                        val id = cursor.getLong(idIdx)
+                        val uri = Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
+                        if (result.none { it.name == name }) result.add(DownloadedFile(name, uri, size, dateSec * 1000, mime))
+                    }
                 }
-            }
+            } catch (_: Exception) {}
+            // Fallback: doğrudan File API ile Download/IndirGitsin ve Download kökü tara (MediaStore RELATIVE_PATH setDestinationInExternalPublicDir ile bozulabiliyor)
+            try {
+                @Suppress("DEPRECATION")
+                val downloadRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val dirsToScan = listOf(downloadRoot, File(downloadRoot, "IndirGitsin")) + try {
+                    val sub = SettingsStore::class.java // dummy to avoid unused import
+                    emptyList<File>()
+                } catch (_: Exception) { emptyList() }
+                // Ayrıca SettingsStore subfolder'ını da tara
+                val extraDirs = mutableListOf<File>()
+                try {
+                    // subfolder adını SettingsStore'dan oku (suspend değil, direkt file list)
+                    val customDirs = downloadRoot.listFiles()?.filter { it.isDirectory } ?: emptyList()
+                    extraDirs.addAll(customDirs)
+                } catch (_: Exception) {}
+                val allDirs = (dirsToScan + extraDirs).distinctBy { it.absolutePath }
+                for (dir in allDirs) {
+                    if (!dir.exists() || !dir.isDirectory) continue
+                    dir.listFiles()?.forEach { f ->
+                        if (!f.isFile) return@forEach
+                        if (!f.name.endsWith(".mp4", true) && !f.name.endsWith(".m4a", true) && !f.name.endsWith(".mp3", true) && !f.name.endsWith(".webm", true) && !f.name.endsWith(".mkv", true)) return@forEach
+                        if (result.any { it.name == f.name }) return@forEach
+                        val mime = when {
+                            f.name.endsWith(".mp3", true) -> "audio/mpeg"
+                            f.name.endsWith(".m4a", true) -> "audio/mp4"
+                            f.name.endsWith(".webm", true) -> "video/webm"
+                            else -> "video/mp4"
+                        }
+                        result.add(DownloadedFile(f.name, Uri.fromFile(f), f.length(), f.lastModified(), mime, f))
+                    }
+                }
+            } catch (_: Exception) {}
+            result.sortByDescending { it.dateMillis }
         } else {
             @Suppress("DEPRECATION")
-            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            dir.listFiles()?.sortedByDescending { it.lastModified() }?.forEach { f ->
-                if (f.isFile && (f.name.endsWith(".mp4", true) || f.name.endsWith(".m4a", true) || f.name.endsWith(".mp3", true) || f.name.endsWith(".webm", true))) {
-                    val mime = when {
-                        f.name.endsWith(".mp3", true) -> "audio/mpeg"
-                        f.name.endsWith(".m4a", true) -> "audio/mp4"
-                        f.name.endsWith(".webm", true) -> "video/webm"
-                        else -> "video/mp4"
+            val downloadRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val dirs = listOf(downloadRoot, File(downloadRoot, "IndirGitsin")) + (downloadRoot.listFiles()?.filter { it.isDirectory } ?: emptyList())
+            for (dir in dirs.distinctBy { it.absolutePath }) {
+                if (!dir.exists() || !dir.isDirectory) continue
+                dir.listFiles()?.sortedByDescending { it.lastModified() }?.forEach { f ->
+                    if (f.isFile && (f.name.endsWith(".mp4", true) || f.name.endsWith(".m4a", true) || f.name.endsWith(".mp3", true) || f.name.endsWith(".webm", true) || f.name.endsWith(".mkv", true))) {
+                        if (result.any { it.name == f.name }) return@forEach
+                        val mime = when {
+                            f.name.endsWith(".mp3", true) -> "audio/mpeg"
+                            f.name.endsWith(".m4a", true) -> "audio/mp4"
+                            f.name.endsWith(".webm", true) -> "video/webm"
+                            else -> "video/mp4"
+                        }
+                        result.add(DownloadedFile(f.name, Uri.fromFile(f), f.length(), f.lastModified(), mime, f))
                     }
-                    result.add(DownloadedFile(f.name, Uri.fromFile(f), f.length(), f.lastModified(), mime, f))
                 }
             }
+            result.sortByDescending { it.dateMillis }
         }
     } catch (_: Exception) {}
     return result
