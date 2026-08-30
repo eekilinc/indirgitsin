@@ -52,7 +52,9 @@ jobs:
   device-test:
     needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
+      fail-fast: false
       matrix:
         api-level: [29, 34]
     steps:
@@ -74,6 +76,9 @@ jobs:
         with:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
+          # The API 29 image otherwise requests >7 GB of userdata on hosted runners.
+          disk-size: 2048M
+          emulator-boot-timeout: 300
           disable-animations: true
           script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
       - uses: actions/upload-artifact@v4
