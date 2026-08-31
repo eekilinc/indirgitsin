@@ -24,7 +24,3 @@
 -dontwarn java.beans.IntrospectionException
 -dontwarn java.beans.Introspector
 -dontwarn java.beans.PropertyDescriptor
-
-# Error Prone's CLASS-retained test annotations refer to this javac-only enum.
-# It is used by static analysis, not by the Android app or instrumentation runtime.
--dontwarn javax.lang.model.element.Modifier
