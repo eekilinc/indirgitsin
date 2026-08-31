@@ -118,4 +118,20 @@ class MediaTransferTest {
         assertEquals("bytes=0-${chunk - 1}", requests.first().getHeader("Range"))
         assertArrayEquals(bytes, file.readBytes())
     }
+
+    @Test(timeout = 20000) fun shortFullResponseCannotOverrideDeclaredMediaLength() {
+        interrupt = false
+        ignoreRange = true
+        replacement = ByteArray(1024) { 3 }
+        try { download("/media?clen=${bytes.size}"); fail("A truncated 200 must not be reported complete") }
+        catch (_: IOException) { }
+        assertEquals(0L, file.length())
+    }
+
+    @Test(timeout = 20000) fun rangeTotalMustMatchDeclaredMediaLength() {
+        interrupt = false
+        try { download("/media?clen=${bytes.size + 1}"); fail("Inconsistent source metadata must be rejected") }
+        catch (_: IOException) { }
+        assertEquals(0L, file.length())
+    }
 }

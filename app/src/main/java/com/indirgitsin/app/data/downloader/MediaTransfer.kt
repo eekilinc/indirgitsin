@@ -25,6 +25,7 @@ object MediaTransfer {
         httpClient: OkHttpClient = client, onProgress: (Long, Long) -> Unit
     ) = withContext(Dispatchers.IO) {
         val parsedUrl = url.toHttpUrl()
+        val declaredLength = parsedUrl.queryParameter("clen")?.toLongOrNull()?.takeIf { it > 0 } ?: -1L
         // Signed CDN URLs expire. itag + modification time + size identify the same rendition.
         // Else keep the complete URL identity; never join unrelated resources with the same ETag.
         val cdnRevision = if (parsedUrl.host.endsWith(".googlevideo.com") && representation.isNotBlank()) {
@@ -88,6 +89,10 @@ object MediaTransfer {
                             }.orEmpty()
                             val range = if (response.code == 206) response.header("Content-Range")?.let(ContentRange::parse)
                                 ?: throw IOException("Sunucu geçersiz Content-Range döndürdü.") else null
+                            if (declaredLength > 0 && ((range != null && range.total != declaredLength) ||
+                                    (range == null && body.contentLength() >= 0 && body.contentLength() != declaredLength))) {
+                                throw IOException("Medya boyutu kaynak bağlantısındaki değerle uyuşmuyor.")
+                            }
                             if (range != null && (range.start != downloaded || range.end > requestedEnd)) {
                                 throw IOException("Sunucu yanlış medya parçası döndürdü.")
                             }
@@ -100,8 +105,8 @@ object MediaTransfer {
                                 if (response.code != 200) return@responseUse
                             }
                             validator = etag
-                            total = range?.total ?: body.contentLength()
-                            val expected = range?.let { it.end - it.start + 1 } ?: body.contentLength()
+                            total = range?.total ?: maxOf(body.contentLength(), declaredLength)
+                            val expected = range?.let { it.end - it.start + 1 } ?: total
                             var received = 0L
                             body.byteStream().use { input ->
                                 val buffer = ByteArray(64 * 1024)
