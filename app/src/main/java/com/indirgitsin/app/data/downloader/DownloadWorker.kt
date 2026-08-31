@@ -118,14 +118,14 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
             coroutineScope {
                 val ticker = launch { while (true) { delay(1_000); progress() } }
                 try {
-                val videoJob = async {
-                    MediaTransfer.download(option.url, primary) { done, total -> primaryBytes.set(done); primaryTotal.set(total); progress() }
-                }
-                val audioJob = if (option.needsMuxing) async {
-                    MediaTransfer.download(requireNotNull(option.audioUrl), audio) { done, total -> audioBytes.set(done); audioTotal.set(total); progress() }
-                } else null
-                videoJob.await()
-                audioJob?.await()
+                    val videoJob = async {
+                        MediaTransfer.download(option.url, primary) { done, total -> primaryBytes.set(done); primaryTotal.set(total); progress() }
+                    }
+                    val audioJob = if (option.needsMuxing) async {
+                        MediaTransfer.download(requireNotNull(option.audioUrl), audio) { done, total -> audioBytes.set(done); audioTotal.set(total); progress() }
+                    } else null
+                    videoJob.await()
+                    audioJob?.await()
                 } finally { ticker.cancel() }
             }
             currentCoroutineContext().ensureActive()

@@ -140,10 +140,13 @@ class MainActivity : ComponentActivity() {
                                     try {
                                         val added = com.indirgitsin.app.data.downloader.FileDownloader.enqueue(this@MainActivity, video, option)
                                         if (added) {
-                                            db.historyDao().insert(com.indirgitsin.app.data.history.HistoryEntity(
-                                                videoId = video.id, title = video.title, author = video.author,
-                                                thumbnailUrl = video.thumbnailUrl, durationSeconds = video.durationSeconds,
-                                                viewCount = video.viewCount, url = video.url, lastQuality = option.label))
+                                            try {
+                                                db.historyDao().insert(com.indirgitsin.app.data.history.HistoryEntity(
+                                                    videoId = video.id, title = video.title, author = video.author,
+                                                    thumbnailUrl = video.thumbnailUrl, durationSeconds = video.durationSeconds,
+                                                    viewCount = video.viewCount, url = video.url, lastQuality = option.label))
+                                            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                                            catch (_: Exception) { /* A history failure must not misreport an already queued download. */ }
                                         }
                                         Toast.makeText(this@MainActivity, if (added) tr(lang, "download_started", option.label)
                                             else tr(lang, "already_queued"), Toast.LENGTH_SHORT).show()

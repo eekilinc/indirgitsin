@@ -7,7 +7,7 @@ ile ses izi bulunmalı; ses yoksa işlem başarılı gösterilmemeli.
 
 - Üretim Kotlin sınıflarını kullanan 30 regresyon kontrolü geçti.
 - cipher/tools/tools.test.mjs içindeki 26 test geçti.
-- Kotlin PSI ile 38 Kotlin dosyasının sözdizimi kontrol edildi.
+- Kotlin PSI ile 41 Kotlin dosyasının sözdizimi kontrol edildi.
 - Gradle 8.13, help --offline göreviyle değiştirilmiş yapılandırmayı başarıyla yükledi.
 - checkReleaseSigning görevi, eksik anahtar durumunda beklendiği gibi yayını engelledi.
 - Android SDK tanımlı değil. SDK indirme izni verilmediği için SDK kurulmadı.
