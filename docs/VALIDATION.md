@@ -75,6 +75,13 @@ Yayınlanan ön sürümün açıklamasındaki Build bağlantısı, o APK'ya ait 
 
 ## Final yayın kapıları
 
+1.1.0 çalışmasında debug API 29/34 ve imzalı release API 34 cihaz testleri geçti.
+Yayın, yeni apksigner çıktısındaki `V2 Signer:` etiketi eski `Signer #1` biçimiyle
+eşleşmediği için durdu; gerçek sertifika beklenen kalıcı anahtarla aynıydı.
+1.1.1 her iki biçimi doğrular, farklı/eksik sertifikayı reddeder; beş araç testi bu denetimi korur.
+Cihaz testinin kaldırdığı release APK ekran görüntüsü kontrolünden önce tekrar kurulur;
+açılış çıktısında `Status: ok` bulunmadan yayın sürdürülmez.
+
 Kalıcı anahtar GitHub Actions secrets üzerinden sağlanır; paket kimliği `.stable` olur.
 Eksik imza, hatalı sertifika veya başarısız doğrulama final yayınını durdurur.
 Debug cihaz testleri API 29/34 üzerinde; ek imzalı release cihaz testi API 34 üzerinde çalışır.

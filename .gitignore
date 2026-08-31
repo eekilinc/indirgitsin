@@ -24,3 +24,7 @@ Thumbs.db
 # Permanent distribution identity: private key and password backup, never commit.
 .release-signing/
 *.p12
+
+# Local Python tooling cache
+__pycache__/
+*.pyc

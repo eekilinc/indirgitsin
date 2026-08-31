@@ -31,6 +31,8 @@ jobs:
         run: ./gradlew :app:testDebugUnitTest :app:lintDebug :cipher:library:testDebugUnitTest --stacktrace
       - name: Cipher tooling tests
         run: node --test cipher/tools/tools.test.mjs
+      - name: Release verification tooling tests
+        run: python3 -m unittest discover -s tools -p 'test_*.py'
       - name: Build debug APK for testing
         run: ./gradlew :app:assembleDebug --stacktrace
       - name: Verify APK signature
@@ -184,16 +186,18 @@ jobs:
           disable-animations: true
           script: |
             ./gradlew :app:connectedReleaseAndroidTest --stacktrace
-            adb shell am start -W -n com.indirgitsin.app.stable/com.indirgitsin.app.MainActivity
+            adb install -r -g app/build/outputs/apk/release/app-release.apk
+            adb shell am start -W -n com.indirgitsin.app.stable/com.indirgitsin.app.MainActivity > app/build/reports/release-launch.txt
+            cat app/build/reports/release-launch.txt
+            grep -q '^Status: ok' app/build/reports/release-launch.txt
+            sleep 2
             adb exec-out screencap -p > app/build/reports/release-home.png
       - name: Verify permanent certificate and prepare release assets
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
           "$APKSIGNER" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk > certificate.txt
           cat certificate.txt
-          ACTUAL=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certificate.txt)
-          EXPECTED=$(tr -d '\r\n' < docs/release-certificate.sha256)
-          test "$ACTUAL" = "$EXPECTED"
+          python3 tools/verify-certificate.py certificate.txt docs/release-certificate.sha256
           cp app/build/outputs/apk/release/app-release.apk "indir-gitsin-${GITHUB_REF_NAME#v}.apk"
           python3 tools/package-source.py "indir-gitsin-${GITHUB_REF_NAME#v}-source.zip"
           sha256sum indir-gitsin-*.apk indir-gitsin-*-source.zip > SHA256SUMS.txt
