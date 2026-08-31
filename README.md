@@ -42,7 +42,7 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 
 ## 1.2 hazırlığında
 
-Çalışan son final **1.1.1**'dir. Bu geliştirme dalında 1.2 adayı hazırlanıyor:
+Çalışan son final **1.1.1**'dir. Bu geliştirme dalındaki **1.2.0-dev.113** imzalı adayı doğrulandı; henüz public final değildir:
 
 - Bağlantı girişini öne çıkaran yeni ana sayfa ve özgün indirme simgesi.
 - Kesintiden sonra doğrulanmış 4 MB HTTP parçalarından devam. Dosya kimliği doğrulanamıyorsa güvenli yeniden başlangıç.
@@ -63,6 +63,12 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 3. İsterseniz dosyanın SHA-256 değerini aynı yayındaki `SHA256SUMS.txt` ile karşılaştırın.
 
 Final paket kimliği `com.indirgitsin.app.stable` olarak sabittir. 1.1.1 ve sonraki final güncellemeleri aynı imzayı korur. **İndir Gitsin Test** ayrı uygulamadır; test uygulamasını kaldırmak zorunlu değildir.
+
+## Doğrulanan sonuç
+
+[CI 113](https://github.com/eekilinc/indirgitsin/actions/runs/33383131109) birim/lint kontrolleri, Android 10/14/16 testleri ve imzalı APK üzerinde Android 14 testleriyle geçti. 1.1.1 üzerine güncelleme doğrulandı. APK **16,81 MB → 4,15 MB** oldu.
+
+Aynı emülatörde ortanca soğuk açılış **801 → 609 ms** ölçüldü; bu, gerçek telefon veya indirme hızı garantisi değildir. [Ölçümler, bellek ve test sınırları](docs/VALIDATION.md).
 
 ## Neden hızlı?
 

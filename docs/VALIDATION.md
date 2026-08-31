@@ -108,3 +108,21 @@ cipher alt modülünün sabitlenmiş sürümü dahil edilerek üretilir; yerel �
 - Yeni hedef API nedeniyle Android 16'da kenar boşlukları, klavye ve geri düğmesi ayrıca kontrol edilmeli.
 
 Bu dalın kesin sonucu, commit'e ait GitHub Actions raporudur. Birleştirme motoru korunmuştur; yeni aktarım/devam davranışının gerçek YouTube ve ağ kesintisi kabul testi telefonda ayrıca yapılmalıdır.
+
+## Doğrulanmış imzalı aday — 1.2.0-dev.113
+
+[CI 113](https://github.com/eekilinc/indirgitsin/actions/runs/33383131109), `8ab6253ba8f0367c0269747f3f554fbb3c0607f9` commit'inde başarılıdır. Sonraki belge güncellemeleri bu APK'nın kodunu değiştirmez. [Ham ölçümler ve dosya özetleri](measurements/candidate-113.json).
+
+- Uygulama JUnit: debug ve release varyantlarında 40'ar test; cipher JUnit: 62 test; JavaScript araçları: 26 test; sertifika araçları: 5 test başarılı.
+- Debug API 29/34/36: her birinde 6 test, sıfır hata ve sıfır atlanan test. Kalıcı imzalı, küçültülmüş release API 34: 6 test, sıfır hata ve sıfır atlanan test.
+- Android lint: sıfır hata; 50 uyarı ve 2 öneri var. Uyarılar çözülmüş gibi gösterilmez.
+- 1.1.1 üzerine kurulum, açılış, kalıcı sertifika, APK/kaynak SHA-256 ve dört ABI'nin statik ELF/ZIP 16 KB hizalaması doğrulandı. Kaynak ZIP'i 158 izlenen dosyayla test edilmiş commit ve sabitlenmiş cipher kaynağına birebir uyuyor.
+- Testi başlatamayan `Trace`, geçersiz final metot ve taşınmış `ViewTreeLifecycleOwner` sorunları ortak API korumalarıyla giderildi. Kuyruk testi terminal durumun yazılmasını bekler. Testler veya uygulama küçültmesi kapatılmadı.
+
+| Ölçüm | 1.1.1 | 1.2.0-dev.113 |
+|---|---:|---:|
+| APK boyutu (bayt) | 16.814.252 | 4.147.488 |
+| Ortanca soğuk açılış (5 örnek) | 801 ms | 609 ms |
+| Boşta toplam PSS (KiB; tek örnek) | 54.617 | 33.449 |
+
+Boyut %75,33 azaldı. Açılış ve bellek aynı Android 14 CI emülatöründe ölçüldü; cihaz, pil, ağ ve uzun indirme performansı hakkında garanti değildir. Yeni adayda gerçek telefon kabul listesi hâlâ uygulanmalıdır. Son public final 1.1.1'dir; bu doğrulama Play Store yayını anlamına gelmez.

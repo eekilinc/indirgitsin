@@ -1,0 +1,123 @@
+{
+  "date": "2026-08-31",
+  "candidate": "1.2.0-dev.113",
+  "commit": "8ab6253ba8f0367c0269747f3f554fbb3c0607f9",
+  "ci": "https://github.com/eekilinc/indirgitsin/actions/runs/33383131109",
+  "ci_conclusion": "success",
+  "baseline": {
+    "version": "1.1.1",
+    "apk_bytes": 16814252,
+    "sha256": "3959296c9d211e8d0c93b55189a83b9b36aa55dbb47b145489696c07ab71ccb5",
+    "measurement": {
+      "environment": "GitHub Actions Android emulator; idle home; not physical-device performance",
+      "api": "34",
+      "package": "com.indirgitsin.app.stable",
+      "cold_launch_ms": [
+        801,
+        865,
+        794,
+        799,
+        837
+      ],
+      "median_cold_launch_ms": 801,
+      "rejected_launch_attempts": [],
+      "idle_total_pss_kb": 54617
+    }
+  },
+  "candidate_files": {
+    "app-release.aab": {
+      "bytes": 8701055,
+      "sha256": "925f5bc8c4ce86c91e397b28f38a854d3a648513c92a80d3c9721a0c6599fea6"
+    },
+    "app-release.apk": {
+      "bytes": 4147488,
+      "sha256": "619d541f3280bf926e469c34047012c8e36c214e2b060b1e4e71f032f02f7d4d"
+    },
+    "indir-gitsin-1.2.0-dev.113-source.zip": {
+      "bytes": 409667,
+      "sha256": "e39206cce5a44fde2833efbfd9cb99301b91efcaf76a64b479138244d079a802"
+    },
+    "indir-gitsin-1.2.0-dev.113.apk": {
+      "bytes": 4147488,
+      "sha256": "619d541f3280bf926e469c34047012c8e36c214e2b060b1e4e71f032f02f7d4d"
+    }
+  },
+  "candidate_measurement": {
+    "environment": "GitHub Actions Android emulator; idle home; not physical-device performance",
+    "api": "34",
+    "package": "com.indirgitsin.app.stable",
+    "cold_launch_ms": [
+      638,
+      609,
+      597,
+      631,
+      599
+    ],
+    "median_cold_launch_ms": 609,
+    "rejected_launch_attempts": [],
+    "idle_total_pss_kb": 33449
+  },
+  "signed_tests": {
+    "reports/androidTests/connected/release/index.html": {
+      "tests": 6,
+      "failures": 0,
+      "skipped": 0
+    },
+    "reports/tests/testReleaseUnitTest/index.html": {
+      "tests": 40,
+      "failures": 0,
+      "ignored": 0
+    }
+  },
+  "validation_reports": {
+    "device-reports-api-29-113.zip": {
+      "androidTests/connected/debug/index.html": {
+        "tests": 6,
+        "failures": 0,
+        "skipped": 0
+      }
+    },
+    "device-reports-api-34-113.zip": {
+      "androidTests/connected/debug/index.html": {
+        "tests": 6,
+        "failures": 0,
+        "skipped": 0
+      }
+    },
+    "device-reports-api-36-113.zip": {
+      "androidTests/connected/debug/index.html": {
+        "tests": 6,
+        "failures": 0,
+        "skipped": 0
+      }
+    },
+    "validation-reports-113.zip": {
+      "lint": {
+        "Warning": 50,
+        "Hint": 2
+      },
+      "app/build/reports/tests/testDebugUnitTest/index.html": {
+        "tests": 40,
+        "failures": 0,
+        "ignored": 0
+      },
+      "cipher/library/build/reports/tests/testDebugUnitTest/index.html": {
+        "tests": 62,
+        "failures": 0,
+        "ignored": 0
+      }
+    }
+  },
+  "certificate_sha256": "4cdb15174ada39cff8a7f8e34947c2c8ad47a45c0f7809ec14b1692d71fc4027",
+  "checks": {
+    "same_apk_tested_and_distributed": true,
+    "upgrade_from_1_1_1": true,
+    "elf_and_zip_16kb_all_four_abis": true,
+    "source_matches_commit_and_cipher_pin_files": 158
+  },
+  "limits": [
+    "Five cold starts and one idle PSS sample per version on the same Android 14 emulator.",
+    "No physical-device, battery, long-download, 16 KB runtime or live YouTube acceptance test of this candidate.",
+    "Root license decision pending; candidate is not a public final or Play Store release."
+  ]
+}

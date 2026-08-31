@@ -39,5 +39,10 @@ MP3 dönüştürme ve HLS/canlı kayıt tamamlanmış sayılmaz. Yeni codec/segm
 
 API 36 mevcut Play hedefini karşılar; lint'in en yeni Android sürümünü öneren `OldTargetApi` uyarısı ayrı konudur. YouTube alan adı projeye ait olmadığı için `AppLinkWarning` uyarısını gidermek amacıyla sahte alan doğrulaması eklenmedi. Bağlantı yapıştırma/paylaşma yolu korunuyor. Bağımlılıklar sürüm numarasını büyütmek amacıyla topluca yükseltilmedi; her güncelleme ayrıca derleme ve cihaz doğrulaması gerektirir.
 
+## İmzalı adayın ölçülmüş sonucu
+[CI 113](https://github.com/eekilinc/indirgitsin/actions/runs/33383131109) tüm doğrulamalardan geçti. APK 16,81 MB'dan **4,15 MB**'a indi; aynı Android 14 emülatöründe beş soğuk açılışın ortancası **801 → 609 ms**, tek boşta PSS örneği **54.617 → 33.449 KiB** oldu. İmzalı APK üzerinde altı test ve 1.1.1 üzerine kurulum başarılıdır. [Ayrıntılı kanıt ve sınırlar](VALIDATION.md).
+
+Bu sonuç indirme hızı, gerçek telefon belleği veya pil tüketimi garantisi değildir. 16 KB kontrolü statiktir; gerçek 16 KB ortam testi henüz yoktur. Public final ve mağaza kararı yukarıdaki açık koşullara bağlı kalır.
+
 ## Mağaza kararı
 Önce içerik hakları ve ürünün kullanım şekli, ardından proje lisansı çözülmeli. Sonra Play Console beyanları, gerçek cihaz testleri ve gerekiyorsa mağaza için ayrı dağıtım tasarımı hazırlanmalı. Mevcut YouTube işlevi bu çalışma kapsamında sessizce kaldırılmadı; **Play Store yayın işlemi yapılmadı**.
