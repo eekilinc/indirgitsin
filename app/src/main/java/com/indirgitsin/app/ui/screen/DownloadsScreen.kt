@@ -31,10 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import androidx.navigation.NavController
 import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.data.lang.tr
-import com.indirgitsin.app.ui.navigation.Screen
 import java.io.File
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -73,7 +71,7 @@ data class ActiveDownload(
 )
 
 @Composable
-fun DownloadsScreen(navController: NavController) {
+fun DownloadsScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val language = LocalAppLanguage.current
@@ -338,7 +336,7 @@ fun DownloadsScreen(navController: NavController) {
                     DownloadCard(
                         item = item,
                         onPlay = {
-                            navController.navigate(Screen.Player.createRoute(item.uri.toString(), item.name))
+                            context.startActivity(com.indirgitsin.app.PlayerActivity.intent(context, item.uri, item.name))
                         },
                         onOpenExternal = { playFile(context, item) },
                         onShare = { shareFile(context, item) },
@@ -623,6 +621,7 @@ private suspend fun deleteFile(context: Context, item: DownloadedFile) {
             } else {
                 check(item.file.delete()) { "Dosya silinemedi." }
             }
+            com.indirgitsin.app.data.downloader.MediaArtwork.remove(context, item.uri)
         }
         Toast.makeText(context, tr(lang, "deleted", item.name), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {

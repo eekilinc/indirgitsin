@@ -87,6 +87,32 @@ class MediaFileMuxerInstrumentedTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun mp3ArtworkAndUnicodeMetadataAreReadableWithoutBreakingAudio() = runBlocking {
+        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "art-test-${UUID.randomUUID()}").apply { mkdirs() }
+        try {
+            val source = File(directory, "audio.m4a")
+            val output = File(directory, "tagged.mp3")
+            encode(source, video = false)
+            val bitmap = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(android.graphics.Color.MAGENTA)
+            val bytes = java.io.ByteArrayOutputStream()
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, bytes)
+            bitmap.recycle()
+            val picture = bytes.toByteArray()
+            AudioMp3Converter.convert(source, output, id3Tag = com.indirgitsin.app.data.downloader.Mp3Tags.create("İstanbul 🎵", "Şarkıcı", picture))
+            val reader = android.media.MediaMetadataRetriever()
+            try {
+                reader.setDataSource(output.absolutePath)
+                assertArrayEquals(picture, reader.embeddedPicture)
+                assertEquals("İstanbul 🎵", reader.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE))
+                assertEquals("Şarkıcı", reader.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST))
+            } finally { reader.release() }
+            AudioMp3Converter.validate(output)
+            assertDecodable(output, "audio/")
+            assertTrue(timestamps(output, "audio/").last() > 2_000_000)
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun capturedTransportStreamKeepsDecodableAudioAndVideo() = verifyCapture("capture.ts")
     @Test fun capturedFragmentedMp4KeepsDecodableAudioAndVideo() = verifyCapture("capture-fmp4.mp4")
 

@@ -108,6 +108,7 @@ jobs:
           disable-animations: true
           script: |
             ./gradlew :app:connectedDebugAndroidTest --stacktrace
+            adb pull /sdcard/Android/data/com.indirgitsin.app.preview/files/player-evidence app/build/reports/player-evidence
             adb install -r -g app/build/outputs/apk/debug/app-debug.apk
             python3 tools/capture-device.py com.indirgitsin.app.preview app/build/reports/device-evidence
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -212,6 +213,7 @@ jobs:
           disable-animations: true
           script: |
             bash tools/run-release-device-tests.sh
+            adb pull /sdcard/Android/data/com.indirgitsin.app.stable/files/player-evidence app/build/reports/player-evidence
             curl --fail --location --retry 3 https://github.com/eekilinc/indirgitsin/releases/download/v1.1.1/indir-gitsin-1.1.1.apk --output "$RUNNER_TEMP/baseline.apk"
             echo "3959296c9d211e8d0c93b55189a83b9b36aa55dbb47b145489696c07ab71ccb5  $RUNNER_TEMP/baseline.apk" | sha256sum --check
             adb install -r -g "$RUNNER_TEMP/baseline.apk"
@@ -283,6 +285,9 @@ jobs:
             - Video ve ses paralel indirilir, yeniden kodlamadan tek dosyada birleştirilir.
             - 128/192/320 kbps gerçek MP3 dönüşümü ve süre sınırlı HLS canlı kayıt.
             - Canlı kaydı uygulamadan veya bildirimden durdurup MP4 olarak kaydetme.
+            - Ses oynatırken çevrimdışı kapak; yeni MP3 dosyalarında gömülü kapak, başlık ve sanatçı.
+            - Video için yatay tam ekran, gizlenen sistem çubukları ve konumu koruyan ekran döndürme.
+            - Kapaksız ses dosyalarında müzik görünümü; oynatma hatalarında yeniden deneme.
             - GPL-3.0 lisansı ve kaynak arşivinde LAME encoder kaynakları.
             - İndirme hızı ve tahmini kalan süre gösterilir.
             - Başarısız işler yeniden denenebilir; aynı video ve kalite aktifken tekrar kuyruğa eklenmez.

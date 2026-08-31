@@ -48,6 +48,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- Compose relayouts playback on rotation without destroying the video surface/player. -->
+        <activity
+            android:name=".PlayerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
+            android:theme="@style/Theme.IndırGitsin" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

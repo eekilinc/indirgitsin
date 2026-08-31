@@ -19,10 +19,11 @@ object AudioMp3Converter {
     // Bound CPU use and serialize LAME's initial shared psychoacoustic tables.
     private val encoderSlot = Semaphore(1)
 
-    suspend fun convert(source: File, output: File, bitrate: Int = 192, progress: (Int) -> Unit = {}) =
+    suspend fun convert(source: File, output: File, bitrate: Int = 192, id3Tag: ByteArray? = null, progress: (Int) -> Unit = {}) =
         withContext(Dispatchers.IO) {
             encoderSlot.withPermit {
                 require(bitrate in setOf(128, 192, 320))
+                require(id3Tag == null || id3Tag.size <= Mp3Tags.MAX_COVER_BYTES + 8192)
                 val extractor = MediaExtractor()
                 var decoder: MediaCodec? = null
                 var encoder: LameEncoder? = null
@@ -51,6 +52,7 @@ object AudioMp3Converter {
                     var sampleCount = 0L
                     var lastActivity = SystemClock.elapsedRealtime()
                     output.outputStream().buffered(64 * 1024).use { sink ->
+                        id3Tag?.let { sink.write(it) }
                         while (!outputEnded) {
                             currentCoroutineContext().ensureActive()
                             check(SystemClock.elapsedRealtime() - lastActivity < 30_000) { "Ses çözücü yanıt vermedi." }

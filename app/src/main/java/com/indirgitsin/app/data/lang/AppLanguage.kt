@@ -7,6 +7,16 @@ val LocalAppLanguage = compositionLocalOf { "tr" }
 // Modüler dil sistemi - yeni dil eklemek için sadece map'e ekle
 object AppStrings {
     private val tr = mapOf(
+        "media_player" to "Medya oynatıcı",
+        "back" to "Geri",
+        "enter_fullscreen" to "Tam ekran",
+        "exit_fullscreen" to "Tam ekrandan çık",
+        "playback_failed" to "Dosya oynatılamadı. Dosyanın mevcut ve desteklenen bir biçimde olduğundan emin olun.",
+        "rewind" to "10 saniye geri",
+        "forward" to "10 saniye ileri",
+        "pause" to "Duraklat",
+        "cover_art" to "Kapak görseli",
+        "audio_placeholder" to "Müzik görseli",
         "live_record" to "Canlı kayıt • MP4",
         "record" to "Kaydet",
         "stop_and_save" to "Durdur ve kaydet",
@@ -236,6 +246,16 @@ object AppStrings {
         "open_with" to "Birlikte Aç"
     )
     private val en = mapOf(
+        "media_player" to "Media player",
+        "back" to "Back",
+        "enter_fullscreen" to "Fullscreen",
+        "exit_fullscreen" to "Exit fullscreen",
+        "playback_failed" to "Cannot play this file. Check that it still exists and uses a supported format.",
+        "rewind" to "Rewind 10 seconds",
+        "forward" to "Forward 10 seconds",
+        "pause" to "Pause",
+        "cover_art" to "Cover artwork",
+        "audio_placeholder" to "Music artwork",
         "live_record" to "Live recording • MP4",
         "record" to "Record",
         "stop_and_save" to "Stop and save",

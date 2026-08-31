@@ -5,6 +5,13 @@
 # R8 cannot see subclasses in the separate test APK; allowing optimization here
 # can finalize methods such as JobSupport.toString and break test subclasses.
 # Refresh when instrumentation or shared framework dependencies change.
+-keep class com.indirgitsin.app.PlayerActivity { *; }
+-keep class com.indirgitsin.app.data.downloader.MediaArtwork { *; }
+-keep class com.indirgitsin.app.data.downloader.MediaArtwork$Entry { *; }
+-keep class com.indirgitsin.app.data.downloader.Mp3Tags { *; }
+-keep class androidx.core.view.ViewCompat { *; }
+-keep class androidx.core.view.WindowInsetsCompat { *; }
+-keep class androidx.core.view.WindowInsetsCompat$Type { *; }
 -keep class androidx.activity.ComponentActivity { *; }
 -keep class androidx.activity.compose.ComponentActivityKt { *; }
 -keep class androidx.annotation.ChecksSdkIntAtLeast { *; }

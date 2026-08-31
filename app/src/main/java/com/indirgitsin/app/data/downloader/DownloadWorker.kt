@@ -138,9 +138,10 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
             bytes.set(done); length.set(total); progress()
         }
         try {
-            coroutineScope {
+            val cover = coroutineScope {
                 val ticker = launch { while (true) { delay(1_000); progress() } }
                 try {
+                    val coverJob = if (option.isAudioOnly) async { MediaArtwork.fetch(info.thumbnailUrl) } else null
                     val videoJob = async {
                         MediaTransfer.download(option.url, primary, "$videoId|${option.extension}|${option.quality}|${option.codec}") { done, total -> streamProgress(done, total, primaryBytes, primaryTotal, primaryInitial) }
                     }
@@ -149,13 +150,14 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
                     } else null
                     videoJob.await()
                     audioJob?.await()
+                    coverJob?.await()
                 } finally { ticker.cancel() }
             }
             currentCoroutineContext().ensureActive()
             val resultFile = if (option.convertToMp3) {
                 setForeground(foreground("MP3'e dönüştürülüyor", 95))
                 var lastConversionUpdate = 0L
-                AudioMp3Converter.convert(primary, output, option.bitrate) { percent ->
+                AudioMp3Converter.convert(primary, output, option.bitrate, Mp3Tags.create(info.title, info.author, cover)) { percent ->
                     val now = SystemClock.elapsedRealtime()
                     if (now - lastConversionUpdate >= 600 || percent == 100) {
                         lastConversionUpdate = now
@@ -175,6 +177,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
             val folder = inputData.getString("folder") ?: SettingsStore.getDownloadSubfolderNow(applicationContext)
             val mime = DownloadStorage.mime(extension, option.isAudioOnly)
             val uri = DownloadStorage.publish(applicationContext, resultFile, name, mime, folder)
+            if (option.isAudioOnly) MediaArtwork.save(applicationContext, uri, MediaArtwork.Entry(info.title, info.author, cover))
             val completedSize = resultFile.length()
             directory.deleteRecursively()
             showResult("İndirme tamamlandı", name)
