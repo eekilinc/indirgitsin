@@ -67,7 +67,9 @@ data class ActiveDownload(
     val stage: String? = null,
     val percent: Int? = null,
     val speed: Long = 0,
-    val eta: Long = -1
+    val eta: Long = -1,
+    val recording: Boolean = false,
+    val resumeId: UUID? = null
 )
 
 @Composable
@@ -122,7 +124,9 @@ fun DownloadsScreen(navController: NavController) {
                 if ("network:unmetered" in job.tags) tr(language, "waiting_unmetered") else tr(language, "waiting_network")
             } else job.progress.getString("stage") ?: tr(language, "status_pending"), job.progress.getInt("percent", 0),
             if (job.state == WorkInfo.State.RUNNING) job.progress.getLong("speed", 0) else 0,
-            if (job.state == WorkInfo.State.RUNNING) job.progress.getLong("eta", -1) else -1)
+            if (job.state == WorkInfo.State.RUNNING) job.progress.getLong("eta", -1) else -1,
+            job.state == WorkInfo.State.RUNNING && job.progress.getBoolean("recording", false),
+            job.tags.firstOrNull { it.startsWith("resume:") }?.removePrefix("resume:")?.let { runCatching { UUID.fromString(it) }.getOrNull() })
     }
     val allActive = active + workerActive
 
@@ -261,7 +265,16 @@ fun DownloadsScreen(navController: NavController) {
                 val downloadingCountText = try { String.format(downloadingCountTemplate, allActive.size) } catch (_: Exception) { downloadingCountTemplate }
                 Text(downloadingCountText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 allActive.forEach { item ->
-                    ActiveDownloadCard(item, onCancel = {
+                    ActiveDownloadCard(item, onStop = {
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    item.resumeId?.let { com.indirgitsin.app.data.downloader.LiveRecordingControl.requestStop(context, it) }
+                                }
+                                Toast.makeText(context, tr(language, "live_stopping"), Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) { Toast.makeText(context, e.message, Toast.LENGTH_SHORT).show() }
+                        }
+                    }, onCancel = {
                         try {
                             if (item.workId != null) FileDownloader.cancel(context, item.workId)
                             else {
@@ -296,6 +309,9 @@ fun DownloadsScreen(navController: NavController) {
                     }) { Text(t("retry")) }
                 }
             }
+        }
+        jobs.filter { it.state == WorkInfo.State.SUCCEEDED && !it.outputData.getString("note").isNullOrBlank() }.takeLast(2).forEach { job ->
+            Text(job.outputData.getString("note").orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -528,7 +544,7 @@ private fun scanActiveDownloads(context: Context): List<ActiveDownload> {
 }
 
 @Composable
-private fun ActiveDownloadCard(item: ActiveDownload, onCancel: () -> Unit) {
+private fun ActiveDownloadCard(item: ActiveDownload, onStop: () -> Unit, onCancel: () -> Unit) {
     val progress = item.percent?.div(100f) ?: if (item.totalBytes > 0) item.bytesDownloaded.toFloat() / item.totalBytes else 0f
     val statusText = item.stage ?: when (item.status) {
         android.app.DownloadManager.STATUS_RUNNING -> t("status_running")
@@ -545,8 +561,13 @@ private fun ActiveDownloadCard(item: ActiveDownload, onCancel: () -> Unit) {
                     Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                     Text("$statusText • ${formatSize(item.bytesDownloaded)} / ${if (item.totalBytes>0) formatSize(item.totalBytes) else "?"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
                 }
-                Text("${(progress*100).toInt()}%", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
+                if (!item.recording) Text("${(progress*100).toInt()}%", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
                 IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = t("cancel"), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+            }
+            if (item.recording && item.resumeId != null) FilledTonalButton(onClick = onStop) {
+                Icon(Icons.Rounded.Stop, null)
+                Spacer(Modifier.width(8.dp))
+                Text(t("stop_and_save"))
             }
             if (item.speed > 0) {
                 val remaining = if (item.eta >= 0) t("remaining_estimate", formatRemaining(item.eta)) else ""

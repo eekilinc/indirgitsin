@@ -7,6 +7,7 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.indirgitsin.app.data.downloader.AudioMp3Converter
 import com.indirgitsin.app.data.downloader.MediaFileMuxer
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -48,7 +49,70 @@ class MediaFileMuxerInstrumentedTest {
         } finally { directory.deleteRecursively() }
     }
 
-    private fun encode(file: File, video: Boolean) {
+    @Test fun mp3ConversionProducesDecodableMonoAndStereoAtAllBitrates() = runBlocking {
+        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "mp3-test-${UUID.randomUUID()}").apply { mkdirs() }
+        try {
+            for (channels in 1..2) {
+                val source = File(directory, "source-$channels.m4a")
+                encode(source, video = false, channels = channels)
+                for (bitrate in listOf(128, 192, 320)) {
+                    val output = File(directory, "result-$channels-$bitrate.mp3")
+                    AudioMp3Converter.convert(source, output, bitrate)
+                    AudioMp3Converter.validate(output)
+                    assertDecodable(output, "audio/")
+                    val timeline = timestamps(output, "audio/")
+                    assertTrue("Truncated MP3", timeline.last() - timeline.first() >= 2_000_000)
+                    val extractor = MediaExtractor()
+                    try {
+                        extractor.setDataSource(output.absolutePath)
+                        val format = extractor.getTrackFormat(0)
+                        assertEquals("audio/mpeg", format.getString(MediaFormat.KEY_MIME))
+                        assertEquals(channels, format.getInteger(MediaFormat.KEY_CHANNEL_COUNT))
+                        assertEquals(bitrate * 1000, format.getInteger(MediaFormat.KEY_BIT_RATE))
+                    } finally { extractor.release() }
+                }
+            }
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun failedMp3ConversionRemovesUnusableOutput() = runBlocking {
+        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "mp3-test-${UUID.randomUUID()}").apply { mkdirs() }
+        try {
+            val source = File(directory, "silent.mp4")
+            val output = File(directory, "invalid.mp3").apply { writeText("old partial data") }
+            encode(source, video = true)
+            assertTrue(runCatching { AudioMp3Converter.convert(source, output) }.isFailure)
+            assertFalse(output.exists())
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun capturedTransportStreamKeepsDecodableAudioAndVideo() = verifyCapture("capture.ts")
+    @Test fun capturedFragmentedMp4KeepsDecodableAudioAndVideo() = verifyCapture("capture-fmp4.mp4")
+
+    private fun verifyCapture(asset: String) = runBlocking {
+        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "live-test-${UUID.randomUUID()}").apply { mkdirs() }
+        try {
+            val source = File(directory, asset)
+            InstrumentationRegistry.getInstrumentation().context.assets.open("live/$asset").use { input ->
+                source.outputStream().use { input.copyTo(it) }
+            }
+            val output = File(directory, "recording.mp4")
+            MediaFileMuxer.remuxCapture(source, output)
+            MediaFileMuxer.validate(output, videoRequired = true)
+            for (prefix in listOf("audio/", "video/")) {
+                assertDecodable(output, prefix)
+                val before = timestamps(source, prefix)
+                val after = timestamps(output, prefix)
+                assertEquals("Capture lost $prefix samples", before.size, after.size)
+                assertTrue("Capture was truncated", after.last() - after.first() > 7_500_000)
+            }
+            val audioStart = timestamps(output, "audio/").first()
+            val videoStart = timestamps(output, "video/").first()
+            assertTrue("A/V synchronization lost", kotlin.math.abs(audioStart - videoStart) < 100_000)
+        } finally { directory.deleteRecursively() }
+    }
+
+    private fun encode(file: File, video: Boolean, channels: Int = 1) {
         val mime = if (video) "video/avc" else "audio/mp4a-latm"
         val codec = MediaCodec.createEncoderByType(mime)
         val writer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
@@ -62,7 +126,7 @@ class MediaFileMuxerInstrumentedTest {
                 setInteger(MediaFormat.KEY_FRAME_RATE, 24)
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
                 setInteger(MediaFormat.KEY_BIT_RATE, 128_000)
-            } else MediaFormat.createAudioFormat(mime, 44_100, 1).apply {
+            } else MediaFormat.createAudioFormat(mime, 44_100, channels).apply {
                 setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
                 setInteger(MediaFormat.KEY_BIT_RATE, 96_000)
                 setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 8192)
@@ -94,7 +158,9 @@ class MediaFileMuxerInstrumentedTest {
                             } else {
                                 buffer.order(ByteOrder.LITTLE_ENDIAN)
                                 repeat(1024) { sample ->
-                                    buffer.putShort((sin(2 * Math.PI * 440 * (inputFrame * 1024 + sample) / 44_100) * 12000).toInt().toShort())
+                                    repeat(channels) { channel ->
+                                        buffer.putShort((sin(2 * Math.PI * (440 + channel * 220) * (inputFrame * 1024 + sample) / 44_100) * 12000).toInt().toShort())
+                                    }
                                 }
                             }
                             codec.queueInputBuffer(index, 0, buffer.position(), pts, 0)

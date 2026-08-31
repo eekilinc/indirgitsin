@@ -1,7 +1,13 @@
 İndir Gitsin — Üçüncü taraf bileşenleri / Third-party notices
 
+İndir Gitsin — Copyright (C) 2026 İndir Gitsin contributors — GPL-3.0-only.
+
 Bu liste ana doğrudan bağımlılıkları tanımlar. Lisanslar ilgili bileşenlere aittir; uygulamanın tamamının MIT lisanslı olduğu anlamına gelmez.
 Main direct dependencies are listed below. Their licenses apply to those components; this is not a claim that the entire app is MIT licensed.
+
+LAME 3.100 — The LAME Project and contributors — LGPL-2.0-or-later
+https://github.com/lameproject/lame/tree/e1f244ae762bc876913002abb22141a3abb2f4b8
+Unmodified encoder sources: app/src/main/cpp/lame/; full LGPL text: LICENSE_LAME_LGPL2.txt.
 
 NewPipeExtractor v0.26.5 — Team NewPipe — GNU GPL v3
 https://github.com/TeamNewPipe/NewPipeExtractor/tree/v0.26.5
@@ -27,7 +33,7 @@ https://github.com/JakeWharton/timber/tree/5.0.1
 
 Uygulama kaynak kodu / Application source:
 https://github.com/eekilinc/indirgitsin
-(Özel depo; erişim izni gerekebilir / Private repository; access may be required.)
+(Herkese açık depo ve sürüm kaynak arşivleri / Public repository and release source archives.)
 
 GNU GPL v3 license text follows:
 

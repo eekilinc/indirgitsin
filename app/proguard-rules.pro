@@ -1,4 +1,6 @@
 # Keep extractor
+-keep class com.indirgitsin.app.data.downloader.LameEncoder { *; }
+
 -keep class org.schabi.newpipe.extractor.** { *; }
 -dontwarn org.schabi.newpipe.extractor.**
 

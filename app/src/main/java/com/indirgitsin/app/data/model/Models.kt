@@ -8,7 +8,8 @@ data class VideoInfo(
     val durationSeconds: Long,
     val viewCount: Long,
     val url: String,
-    val streams: List<StreamOption> = emptyList()
+    val streams: List<StreamOption> = emptyList(),
+    val isLive: Boolean = false
 )
 
 data class StreamOption(
@@ -23,7 +24,10 @@ data class StreamOption(
     val audioUrl: String? = null,
     val isVideoOnly: Boolean = false,
     val codec: String = "",
-    val audioCodec: String = ""
+    val audioCodec: String = "",
+    val convertToMp3: Boolean = false,
+    val isLive: Boolean = false,
+    val recordMinutes: Int = 15
 ) {
     val needsMuxing: Boolean get() = isVideoOnly && !audioUrl.isNullOrBlank()
     val hasAudio: Boolean get() = isAudioOnly || (isVideo && (!isVideoOnly || needsMuxing))

@@ -2,6 +2,17 @@ package com.indirgitsin.app.data.model
 
 /** Resolution does not describe track layout: 360p may also be video-only. */
 object StreamSelector {
+    fun withMp3Options(streams: List<StreamOption>): List<StreamOption> {
+        val originals = streams.filterNot { it.convertToMp3 }
+        val source = originals.filter { it.isAudioOnly && it.isDownloadable && !it.isLive }
+            .sortedWith(compareByDescending<StreamOption> { it.extension == "m4a" }.thenByDescending { it.bitrate })
+            .firstOrNull() ?: return originals
+        return originals + listOf(128, 192, 320).map { bitrate ->
+            source.copy(label = "MP3 • ${bitrate}kbps", extension = "mp3", quality = "${bitrate}kbps",
+                bitrate = bitrate, convertToMp3 = true)
+        }
+    }
+
     fun prepare(streams: List<StreamOption>, sdkInt: Int): List<StreamOption> {
         val audio = streams.filter { it.isAudioOnly && it.url.isNotBlank() }
         return streams.mapNotNull { stream ->

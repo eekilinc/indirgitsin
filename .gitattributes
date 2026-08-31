@@ -1,0 +1,2 @@
+# Preserve exact upstream file bytes recorded in UPSTREAM.json.
+app/src/main/cpp/lame/** -text

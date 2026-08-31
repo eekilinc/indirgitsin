@@ -19,6 +19,7 @@ val releaseSigningReady = listOf(releaseStore, releaseStorePassword, releaseAlia
 android {
     namespace = "com.indirgitsin.app"
     compileSdk = 36
+    ndkVersion = "28.2.13676358"
     testBuildType = System.getenv("ANDROID_TEST_BUILD_TYPE") ?: "debug"
 
     defaultConfig {
@@ -71,6 +72,9 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    externalNativeBuild {
+        cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" }
     }
     packaging {
         resources {

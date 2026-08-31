@@ -50,6 +50,8 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 - Public GitHub güncelleme kontrolü; otomatik kontrolde altı saatlik aralık ve HTTP önbelleği.
 - TR/EN çevrimdışı gizlilik politikası.
 - Android 16 hedefi, optimize final APK/AAB ve daha geniş cihaz doğrulaması.
+- Gerçek MP3 dönüşümü: 128, 192 veya 320 kbps; kaynak ses korunarak ayrı MP3 oluşturulur.
+- Şifresiz birleşik HLS canlı kayıt: 5/15/30/60 dakika, **Durdur ve kaydet**, kesintiden önceki bölümün kurtarılması.
 
 <p align="center">
   <img src="docs/assets/home-android14.png" alt="İndir Gitsin yeni ana sayfa — gerçek Android 14 emülatör görüntüsü" width="280">
@@ -64,9 +66,9 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 
 Final paket kimliği `com.indirgitsin.app.stable` olarak sabittir. 1.1.1 ve sonraki final güncellemeleri aynı imzayı korur. **İndir Gitsin Test** ayrı uygulamadır; test uygulamasını kaldırmak zorunlu değildir.
 
-## Doğrulanan sonuç
+## Önceki adayın doğrulanan sonucu
 
-[CI 113](https://github.com/eekilinc/indirgitsin/actions/runs/33383131109) birim/lint kontrolleri, Android 10/14/16 testleri ve imzalı APK üzerinde Android 14 testleriyle geçti. 1.1.1 üzerine güncelleme doğrulandı. APK **16,81 MB → 4,15 MB** oldu.
+MP3/canlı kayıt eklenmeden önceki [CI 113](https://github.com/eekilinc/indirgitsin/actions/runs/33383131109) birim/lint kontrolleri, Android 10/14/16 testleri ve imzalı APK üzerinde Android 14 testleriyle geçti. 1.1.1 üzerine güncelleme doğrulandı. APK **16,81 MB → 4,15 MB** oldu.
 
 Aynı emülatörde ortanca soğuk açılış **801 → 609 ms** ölçüldü; bu, gerçek telefon veya indirme hızı garantisi değildir. [Ölçümler, bellek ve test sınırları](docs/VALIDATION.md).
 
@@ -87,7 +89,7 @@ flowchart LR
 
 ## Sınırları açıkça
 
-**MP3 dönüştürme ve HLS/canlı yayın kaydı yoktur.** Kalite, kaynak akışlarına ve cihaz codec desteğine bağlıdır. WebM/Opus birleştirme Android 10+, MP4/AV1 Android 14+ ister. YouTube değişiklikleri veya erişim kısıtları bazı videoları etkileyebilir.
+Yeni 1.2 dalında MP3 kodlama ve sınırlı HLS canlı kayıt vardır; 1.1.1 finalde bu özellikler yoktur. MP3 kayıplı dönüşümdür; yüksek bitrate kaynak sesin kalitesini artırmaz. Canlı kayıt en fazla 60 dakika / 2 GiB ile sınırlıdır; en son tamamlanan parçadan başlar. Birleşik AVC/AAC akışları desteklenir; ayrı ses listeleri, DASH ve DRM desteklenmez. **İptal** geçici kaydı siler; **Durdur ve kaydet** tamamlanan bölümü saklar. [Kullanım ve sınırlar](docs/MP3_LIVE.md). Kalite, kaynak akışlarına ve cihaz codec desteğine bağlıdır. WebM/Opus birleştirme Android 10+, MP4/AV1 Android 14+ ister. YouTube değişiklikleri veya erişim kısıtları bazı videoları etkileyebilir.
 
 Devam etme, doğrulanmış tam HTTP parçalarını kullanır; kesilen son parça yeniden alınabilir. Tamamlanan dosyalar ortak Download alanındadır. Android'in zorla durdurma, ağ ve arka plan sınırları işlemleri erteleyebilir.
 
@@ -99,7 +101,7 @@ cd indirgitsin
 ./gradlew :app:assembleDebug
 ```
 
-JDK 17, Android SDK 36 ve Android 7.0+ gerekir. UI: Compose/Material 3; veri: Room/DataStore; aktarım: OkHttp/WorkManager; medya: Android MediaMuxer/Media3; çözümleme: NewPipeExtractor ve sabitlenmiş cipher alt modülü.
+JDK 17, Android SDK 36, NDK 28.2.13676358, CMake 3.22.1 ve Android 7.0+ gerekir. Gradle sabit NDK/CMake sürümlerini kullanır. Cihaz testinden önce `bash tools/generate-hls-fixtures.sh` çalıştırılır (FFmpeg yalnızca sentetik test dosyalarını üretir). UI: Compose/Material 3; veri: Room/DataStore; aktarım: OkHttp/WorkManager; medya: Android MediaMuxer/Media3; çözümleme: NewPipeExtractor ve sabitlenmiş cipher alt modülü.
 
 **[Derleme ve imzalama](docs/RELEASING.md)** · **[Doğrulama rehberi](docs/VALIDATION.md)** · **[Yayın hazırlığı ve performans sınırları](docs/PUBLISHING_READINESS.md)**
 
@@ -107,6 +109,6 @@ JDK 17, Android SDK 36 ve Android 7.0+ gerekir. UI: Compose/Material 3; veri: Ro
 
 Hata raporları için [issue şablonunu](https://github.com/eekilinc/indirgitsin/issues/new/choose), güvenlik açıkları için [özel bildirim kanalını](SECURITY.md) kullanın. PR'lar test edilir; imza sırları PR işlerine verilmez.
 
-**Ana proje lisansı henüz seçilmemiştir.** Public erişim kendiliğinden yeniden dağıtım lisansı vermez. GPL bileşenleri ve kaynak kodu yükümlülükleri için [lisans durumunu](docs/LICENSE_STATUS.md) okuyun. Ana bağımlılık metinleri uygulamada Ayarlar → Lisans bölümündedir.
+**GPL-3.0-only.** Hak sahibi onayıyla ana proje [GNU GPL v3](LICENSE) altında yayımlanır. Üçüncü taraf bileşenlerin kendi lisansları korunur; LAME 3.100 encoder kaynakları ve LGPL metni depoda ve kaynak ZIP’inde yer alır. [Lisans ve kaynak dağıtımı](docs/LICENSE_STATUS.md). Ana bağımlılık metinleri uygulamada Ayarlar → Lisans bölümündedir.
 
 [Katkıda bulunma](CONTRIBUTING.md) · [Gizlilik politikası](docs/PRIVACY.md) · [Güvenlik](SECURITY.md)

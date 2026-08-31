@@ -94,7 +94,7 @@ cipher alt modülünün sabitlenmiş sürümü dahil edilerek üretilir; yerel �
 
 ## Bilinen sınırlar
 
-- MP3 kodlama ve HLS/canlı kayıt yok.
+- CI 113 MP3 ve canlı kayıt öncesini ölçer. Yeni özelliklerin kapsamı ve kabul testleri [MP3_LIVE.md](MP3_LIVE.md) içindedir; CI 113 değerleri yeni native encoder boyutunu veya yükünü temsil etmez.
 - Doğrulanmış tam HTTP parçalarından devam vardır. Kesilen son parça veya doğrulanamayan kaynak baştan alınır.
 - YouTube erişim/PoToken kısıtları tüm videolar için başarı garantisi vermez.
 - Cihazın codec ve işletim sistemi desteği gerçek dosyayla kontrol edilmelidir.

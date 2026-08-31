@@ -22,7 +22,12 @@ object NewPipeHelper {
             val extractor = service.getStreamExtractor(service.streamLHFactory.fromId(videoId))
             extractor.fetchPage()
             val streams = mutableListOf<StreamOption>()
-            for (audio in extractor.audioStreams.orEmpty()) {
+            val live = extractor.streamType.name == "LIVE_STREAM"
+            if (live) {
+                val hls = extractor.hlsUrl
+                if (hls.startsWith("https://")) streams += StreamOption("Canlı kayıt • MP4", "mp4", "live", hls, true, false, isLive = true)
+            }
+            for (audio in if (live) emptyList() else extractor.audioStreams.orEmpty()) {
                 if (!audio.isUrl || audio.deliveryMethod == DeliveryMethod.HLS) continue
                 val url = audio.content?.takeIf { it.startsWith("https://") || it.startsWith("http://") } ?: continue
                 val ext = audio.getFormat()?.suffix?.lowercase() ?: continue
@@ -30,7 +35,7 @@ object NewPipeHelper {
                 streams += StreamOption("Ses • ${ext.uppercase()} ${bitrate}kbps", ext,
                     "${bitrate}kbps", url, false, true, bitrate = bitrate, codec = audio.codec.orEmpty())
             }
-            for (video in extractor.videoStreams.orEmpty() + extractor.videoOnlyStreams.orEmpty()) {
+            for (video in if (live) emptyList() else extractor.videoStreams.orEmpty() + extractor.videoOnlyStreams.orEmpty()) {
                 if (!video.isUrl || video.deliveryMethod == DeliveryMethod.HLS) continue
                 val url = video.content?.takeIf { it.startsWith("https://") || it.startsWith("http://") } ?: continue
                 val ext = video.getFormat()?.suffix?.lowercase() ?: continue
@@ -43,7 +48,7 @@ object NewPipeHelper {
             if (prepared.isEmpty()) return@withContext null
             VideoInfo(videoId, extractor.name, extractor.uploaderName,
                 extractor.thumbnails.maxByOrNull { it.height }?.url ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
-                extractor.length, extractor.viewCount, "https://www.youtube.com/watch?v=$videoId", prepared)
+                extractor.length, extractor.viewCount, "https://www.youtube.com/watch?v=$videoId", prepared, isLive = live)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

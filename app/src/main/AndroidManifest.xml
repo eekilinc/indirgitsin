@@ -37,6 +37,10 @@
         </provider>
 
         <receiver
+            android:name=".data.downloader.LiveRecordingReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".data.downloader.DownloadCompleteReceiver"
             android:exported="true">
             <intent-filter>

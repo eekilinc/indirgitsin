@@ -41,8 +41,9 @@ object YoutubeExtractor {
             val direct = withTimeoutOrNull(30_000) { NewPipeHelper.extract(id) }
             currentCoroutineContext().ensureActive()
             // No video IDs are sent to public Piped/Invidious/Cobalt instances.
-            val result = direct ?: withTimeoutOrNull(60_000) { extractWeb(id, context.applicationContext) }
+            val extracted = direct ?: withTimeoutOrNull(60_000) { extractWeb(id, context.applicationContext) }
                 ?: error("İndirilebilir ses/video akışı bulunamadı. Canlı yayınlar ve kısıtlı videolar desteklenmeyebilir.")
+            val result = extracted.copy(streams = StreamSelector.withMp3Options(extracted.streams))
             synchronized(cache) { cache[id] = Cached(result, System.currentTimeMillis()) }
             Result.success(result)
         } catch (e: CancellationException) {
@@ -74,8 +75,15 @@ object YoutubeExtractor {
         val response = player ?: return null
         val details = response.optJSONObject("videoDetails") ?: return null
         val streaming = response.optJSONObject("streamingData") ?: return null
+        val live = details.optBoolean("isLive") || response.optJSONObject("microformat")
+            ?.optJSONObject("playerMicroformatRenderer")?.optJSONObject("liveBroadcastDetails")?.optBoolean("isLiveNow") == true
         val streams = mutableListOf<StreamOption>()
+        if (live) {
+            val hls = streaming.optString("hlsManifestUrl")
+            if (hls.startsWith("https://")) streams += StreamOption("Canlı kayıt • MP4", "mp4", "live", hls, true, false, isLive = true)
+        }
         for (arrayName in listOf("formats", "adaptiveFormats")) {
+            if (live) break
             val formats = streaming.optJSONArray(arrayName) ?: continue
             for (i in 0 until formats.length()) {
                 currentCoroutineContext().ensureActive()
@@ -106,6 +114,6 @@ object YoutubeExtractor {
         val thumbnail = thumbnails?.optJSONObject(thumbnails.length() - 1)?.optString("url")
         return VideoInfo(id, details.optString("title", "Video"), details.optString("author"),
             thumbnail ?: "https://i.ytimg.com/vi/$id/hqdefault.jpg", details.optString("lengthSeconds").toLongOrNull() ?: 0,
-            details.optString("viewCount").toLongOrNull() ?: 0, watchUrl, prepared)
+            details.optString("viewCount").toLongOrNull() ?: 0, watchUrl, prepared, isLive = live)
     }
 }

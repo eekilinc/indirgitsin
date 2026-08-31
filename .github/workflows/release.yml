@@ -18,6 +18,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
+      - name: Generate synthetic live media test fixtures
+        run: |
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+          bash tools/generate-hls-fixtures.sh
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
@@ -73,6 +77,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
+      - name: Generate synthetic live media test fixtures
+        run: |
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+          bash tools/generate-hls-fixtures.sh
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
@@ -162,6 +170,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
+      - name: Generate synthetic live media test fixtures
+        run: |
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+          bash tools/generate-hls-fixtures.sh
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
@@ -269,6 +281,9 @@ jobs:
             - Kesintiden sonra doğrulanmış HTTP parçalarından devam ve etkin olmayan yarım dosyaları temizleme.
             - Android 16 hedefi, R8/kaynak küçültme, public güncelleme önbelleği ve uygulama içi gizlilik politikası.
             - Video ve ses paralel indirilir, yeniden kodlamadan tek dosyada birleştirilir.
+            - 128/192/320 kbps gerçek MP3 dönüşümü ve süre sınırlı HLS canlı kayıt.
+            - Canlı kaydı uygulamadan veya bildirimden durdurup MP4 olarak kaydetme.
+            - GPL-3.0 lisansı ve kaynak arşivinde LAME encoder kaynakları.
             - İndirme hızı ve tahmini kalan süre gösterilir.
             - Başarısız işler yeniden denenebilir; aynı video ve kalite aktifken tekrar kuyruğa eklenmez.
             - İsteğe bağlı yalnızca tarifesiz ağ ayarı (yeni indirmeler için).
@@ -282,7 +297,7 @@ jobs:
             Önceki test sürümünün gerçek telefonda sesli video indirdiği kullanıcı tarafından doğrulandı. Yeni sürümün gerçek YouTube testi cihazda ayrıca yapılmalıdır.
 
             APK, SHA256SUMS.txt ve cipher alt modülünü içeren kaynak kod arşivi aşağıdadır. Depo ve sürümler herkese açıktır; indirmek için GitHub hesabı gerekmez.
-            Doğrulanmış HTTP parçalarından devam desteklenir; dosya kimliği doğrulanamazsa güvenle baştan başlanır. MP3 dönüştürme ve canlı yayın kaydı desteklenmez.
+            Doğrulanmış HTTP parçalarından devam desteklenir; dosya kimliği doğrulanamazsa güvenle baştan başlanır. 128/192/320 kbps gerçek MP3 dönüştürme ve şifresiz, birleşik ses/görüntülü HLS canlı kaydı desteklenir. Kayıt en fazla 60 dakika / 2 GiB; ayrı ses listeleri ve DRM desteklenmez.
 
             Commit: ${{ github.sha }}
             Build: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

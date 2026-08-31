@@ -449,8 +449,9 @@ private fun YtDownloadSheet(
     val settingsContext = LocalContext.current
     val autoHigh by SettingsStore.autoHighFlow(settingsContext).collectAsState(initial = true)
     val audioFormat by SettingsStore.audioFormatFlow(settingsContext).collectAsState(initial = "M4A")
+    var recordMinutes by rememberSaveable(video.id) { mutableIntStateOf(15) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AsyncImage(
                     model = video.thumbnailUrl.ifBlank { "https://i.ytimg.com/vi/${video.id}/hqdefault.jpg" },
@@ -471,10 +472,21 @@ private fun YtDownloadSheet(
                 }
             }
             // YouTube Premium style segmented
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            if (!video.isLive) SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(selected = selectedTab == 0, onClick = { onTabChange(0) }, shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp), icon = { Icon(Icons.Rounded.Videocam, null, modifier = Modifier.size(16.dp)) }) { Text(t("video")) }
                 SegmentedButton(selected = selectedTab == 1, onClick = { onTabChange(1) }, shape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp), icon = { Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(16.dp)) }) { Text(t("audio")) }
             }
+            if (video.isLive) {
+                Text(t("live_record_hint"), style = MaterialTheme.typography.bodySmall)
+                Text(t("live_duration"), fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(5, 15, 30, 60).forEach { minutes ->
+                        FilterChip(selected = recordMinutes == minutes, onClick = { recordMinutes = minutes },
+                            label = { Text(t("minutes_value", minutes)) })
+                    }
+                }
+            } else if (selectedTab == 1) Text(t("mp3_conversion_hint"), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
 // Chip filtreleri: 0 Tümü (tab'a göre), 1 Video, 2 Music, 3 Shorts, 4 4K
             // Video tab: sesli mux'lar (parantezsiz) + sentezlenmiş mux'lar; video-only'ler gizli (artık otomatik birleştiriliyor)
             val recommended = StreamSelector.preferred(video.streams, autoHigh, audioFormat)
@@ -482,7 +494,7 @@ private fun YtDownloadSheet(
                 .sortedBy { if (it == recommended) 0 else 1 }
             val audioOnlyStreams = video.streams.filter { it.isAudioOnly && it.isDownloadable }
                 .sortedWith(compareByDescending<StreamOption> { it.extension.equals(audioFormat, true) }.thenByDescending { it.bitrate })
-            val baseByTab = if (selectedTab == 0) muxedStreams else audioOnlyStreams
+            val baseByTab = if (selectedTab == 0 || video.isLive) muxedStreams else audioOnlyStreams
             val (filtered, chipNote) = when (filterChip) {
                 1 -> baseByTab.filter { it.isVideo } to null
                 2 -> audioOnlyStreams to null
@@ -507,7 +519,10 @@ private fun YtDownloadSheet(
             } else if (filtered.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     filtered.forEach { opt ->
-                        YtOptionRow(label = opt.label, sublabel = "${opt.extension.uppercase()} • ${if (opt.isVideo) t("sublabel_video") else t("sublabel_audio")}", isVideo = opt.isVideo, onClick = { onDownload(opt) })
+                        YtOptionRow(label = if (opt.isLive) t("live_record") else opt.label,
+                            sublabel = "${opt.extension.uppercase()} • ${if (opt.isVideo) t("sublabel_video") else t("sublabel_audio")}",
+                            isVideo = opt.isVideo, actionLabel = if (opt.isLive) t("record") else null,
+                            onClick = { onDownload(if (opt.isLive) opt.copy(recordMinutes = recordMinutes) else opt) })
                     }
                 }
             }
@@ -521,7 +536,7 @@ private fun YtDownloadSheet(
 }
 
 @Composable
-private fun YtOptionRow(label: String, sublabel: String, isVideo: Boolean, onClick: () -> Unit) {
+private fun YtOptionRow(label: String, sublabel: String, isVideo: Boolean, actionLabel: String? = null, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -541,7 +556,7 @@ private fun YtOptionRow(label: String, sublabel: String, isVideo: Boolean, onCli
             FilledTonalButton(onClick = onClick, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.filledTonalButtonColors(containerColor = YtRed, contentColor = Color.White), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
                 Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(t("download"), fontWeight = FontWeight.Bold)
+                Text(actionLabel ?: t("download"), fontWeight = FontWeight.Bold)
             }
         }
     }

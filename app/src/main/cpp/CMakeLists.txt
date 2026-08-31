@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(indirgitsin_mp3 C)
+set(CMAKE_C_STANDARD 99)
+# Encoding only: no command-line frontend, MPGLIB decoder or architecture assembly.
+file(GLOB LAME_SOURCES CONFIGURE_DEPENDS "lame/libmp3lame/*.c")
+add_library(indirgitsin_mp3 SHARED ${LAME_SOURCES} mp3_jni.c)
+target_include_directories(indirgitsin_mp3 PRIVATE . lame/include lame/libmp3lame)
+target_compile_definitions(indirgitsin_mp3 PRIVATE HAVE_CONFIG_H)
+target_compile_options(indirgitsin_mp3 PRIVATE -O2 -fvisibility=hidden)
+target_link_options(indirgitsin_mp3 PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
+target_link_libraries(indirgitsin_mp3 m)

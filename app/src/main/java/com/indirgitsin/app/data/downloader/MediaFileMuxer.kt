@@ -12,6 +12,54 @@ import java.nio.ByteBuffer
 
 /** Copies encoded samples and their original timestamps; never fabricates a silent video. */
 object MediaFileMuxer {
+    /** Remux a contiguous, unencrypted TS/fMP4 capture into a seekable MP4 without re-encoding. */
+    suspend fun remuxCapture(source: File, output: File) {
+        val reader = MediaExtractor()
+        var writer: MediaMuxer? = null
+        var succeeded = false
+        try {
+            reader.setDataSource(source.absolutePath)
+            val video = findTrack(reader, "video/")
+            val audio = findTrack(reader, "audio/")
+            require(video >= 0 && audio >= 0) { "Canlı yayında hem görüntü hem ses bulunamadı." }
+            val videoFormat = reader.getTrackFormat(video)
+            val audioFormat = reader.getTrackFormat(audio)
+            checkCompatibility(videoFormat.getString(MediaFormat.KEY_MIME).orEmpty(), audioFormat.getString(MediaFormat.KEY_MIME).orEmpty(), "mp4")
+            val muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            writer = muxer
+            val tracks = mapOf(video to muxer.addTrack(videoFormat), audio to muxer.addTrack(audioFormat))
+            reader.selectTrack(video); reader.selectTrack(audio)
+            muxer.start()
+            var buffer = ByteBuffer.allocateDirect(2 * 1024 * 1024)
+            val info = MediaCodec.BufferInfo()
+            val counts = mutableMapOf(video to 0L, audio to 0L)
+            // Android's TS/MP4 extractor exposes both tracks on one shared timeline.
+            val firstTime = reader.sampleTime.coerceAtLeast(0)
+            while (reader.sampleTrackIndex >= 0) {
+                currentCoroutineContext().ensureActive()
+                val required = if (Build.VERSION.SDK_INT >= 28) reader.sampleSize else 16L * 1024 * 1024
+                require(required in 1..64L * 1024 * 1024) { "Yayın karesi desteklenen sınırı aşıyor." }
+                if (required > buffer.capacity()) buffer = ByteBuffer.allocateDirect(required.toInt())
+                buffer.clear()
+                val size = reader.readSampleData(buffer, 0)
+                check(size > 0 && reader.sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED == 0) { "Yayın örneği eksik veya şifreli." }
+                val track = reader.sampleTrackIndex
+                info.set(0, size, (reader.sampleTime - firstTime).coerceAtLeast(0),
+                    if (reader.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+                buffer.position(0); buffer.limit(size)
+                muxer.writeSampleData(requireNotNull(tracks[track]), buffer, info)
+                counts[track] = counts.getValue(track) + 1
+                reader.advance()
+            }
+            check(counts.values.all { it > 0 }) { "Canlı kayıt ses veya görüntü içermiyor." }
+            muxer.stop()
+            validate(output, true)
+            succeeded = true
+        } finally {
+            try { writer?.release() } finally { reader.release(); if (!succeeded) output.delete() }
+        }
+    }
+
     suspend fun mux(video: File, audio: File, output: File, extension: String) {
         val v = MediaExtractor()
         val a = MediaExtractor()

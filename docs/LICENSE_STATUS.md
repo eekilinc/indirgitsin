@@ -1,11 +1,16 @@
-# Lisans durumu — karar gerekiyor
-Ana depoda LICENSE bulunmuyor. Depoyu public yapmak kendi başına bir açık kaynak lisansı vermez. Bu çalışma ana projeyi otomatik olarak yeniden lisanslamaz.
+# Lisans ve kaynak dağıtımı
 
-- `cipher/`: depoda GPL-3.0 metni bulunur.
-- NewPipeExtractor: GPL v3 ailesindeki koşullara tabidir.
-- Diğer bileşen bildirimleri ve lisans metinleri uygulamada Ayarlar → Lisans bölümündedir.
-- Kaynak ZIP'i, final sürümün app kodunu ve sabitlenmiş cipher kaynaklarını birlikte içerir.
+Hak sahibi GPL seçimini 31 Ağustos 2026 tarihinde onayladı. İndir Gitsin ana uygulamasının lisansı **GPL-3.0-only**; tam metin kökteki [LICENSE](../LICENSE) dosyasındadır. Copyright (C) 2026 İndir Gitsin contributors. Garanti verilmez; dağıtım ve değişiklik koşulları lisans metnindedir.
 
-GPL bileşenlerinin birleşik uygulama olarak dağıtılması lisans yükümlülükleri doğurur. Öneri: hak sahibi, tüm kaynakların kökenini ve lisans uyumunu doğruladıktan sonra ana uygulama için **GPL-3.0** seçimini açıkça onaylasın; LICENSE, telif bildirimleri ve kaynak dağıtımı birlikte düzenlensin. MIT etiketi tek başına bu bağımlılıkları yeniden lisanslamaz.
+Üçüncü taraf kodlar kendi lisans ve telif bildirimlerini korur:
 
-Bu dosya hukuki görüş veya lisans verme işlemi değildir. [GNU GPL açıklaması](https://www.gnu.org/licenses/gpl-faq.html#IfLibraryIsGPL) ve bağımlılıkların kendi lisansları ayrıca incelenmelidir. Lisans seçimi çözülene kadar geniş dağıtım/mağaza hazırlığı tamamlanmış sayılmaz.
+- `cipher/`: sabitlenmiş GPL v3 alt modülü, kaynak ZIP'ine dahil.
+- NewPipeExtractor: GPL v3 ailesi; sürümü ve kaynak adresi uygulama içi bildirimlerde.
+- LAME 3.100: **LGPL-2.0-or-later**; değiştirilmemiş encoder kaynakları `app/src/main/cpp/lame/` içinde. Resmî proje aynasının `e1f244ae762bc876913002abb22141a3abb2f4b8` revizyonu. `UPSTREAM.json` her dosyanın SHA-256 değerini, `COPYING` lisans metnini içerir.
+- AndroidX, Kotlin, OkHttp ve diğer bağımlılıkların bildirimleri Ayarlar → Lisans bölümündedir.
+
+LAME ayrı `libindirgitsin_mp3.so` kitaplığı olarak uygulamayla derlenir. JNI bağlayıcısı, CMake/config dosyaları ve Kotlin dönüşüm kodu ana uygulamanın GPL v3 lisansındadır. LAME kaynaklarında değişiklik yapılmadı; frontend, MPGLIB decoder ve assembly derlenmez. FFmpeg yalnızca CI test verisini üretir; uygulamaya dahil değildir.
+
+Kaynak ZIP'i sürümün izlenen uygulama dosyalarını, vendored LAME kaynaklarını, derleme tariflerini ve sabit cipher revizyonunu birlikte içerir. NDK/CMake sürümleri Gradle'da sabittir. Değiştirilmiş LAME veya uygulama ile `./gradlew :app:assembleDebug` yeniden derlenebilir; kullanıcı kendi anahtarıyla release de üretebilir. Dağıtımın özel imza anahtarı kaynak paketine konulmaz. Derleme ve imzalama adımları [RELEASING.md](RELEASING.md) içindedir.
+
+Bu lisans seçimi içerik indirme izni, YouTube şartlarına uyum veya Play Store kabulü sağlamaz. Mağaza için açık konular [yayın hazırlığı değerlendirmesinde](PUBLISHING_READINESS.md) ayrı tutulur.

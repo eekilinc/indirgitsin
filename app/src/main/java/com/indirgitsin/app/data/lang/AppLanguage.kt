@@ -7,6 +7,14 @@ val LocalAppLanguage = compositionLocalOf { "tr" }
 // Modüler dil sistemi - yeni dil eklemek için sadece map'e ekle
 object AppStrings {
     private val tr = mapOf(
+        "live_record" to "Canlı kayıt • MP4",
+        "record" to "Kaydet",
+        "stop_and_save" to "Durdur ve kaydet",
+        "live_stopping" to "Tamamlanan yayın parçaları kaydediliyor…",
+        "live_duration" to "En fazla kayıt süresi",
+        "minutes_value" to "%d dk",
+        "live_record_hint" to "Hazır olan son yayın parçasından başlar. En fazla 60 dakika / 2 GiB. İndirilenler'den veya bildirimden Durdur ve kaydet ile bitir; İptal kaydı siler. Ayrı sesli ve şifreli/DRM HLS desteklenmez.",
+        "mp3_conversion_hint" to "MP3 cihazda dönüştürülür; daha yüksek bit hızı kaynak kalitesini artırmaz. M4A/WebM özgün akışı korur.",
         "operation_failed" to "İşlem tamamlanamadı. Yeniden deneyin.",
         "home_headline" to "Bağlantıyı ekle.\nİndirmeye hazır ol.",
         "home_subtitle" to "Videonu veya sesini seç, indirmelerini tek yerden yönet.",
@@ -228,6 +236,14 @@ object AppStrings {
         "open_with" to "Birlikte Aç"
     )
     private val en = mapOf(
+        "live_record" to "Live recording • MP4",
+        "record" to "Record",
+        "stop_and_save" to "Stop and save",
+        "live_stopping" to "Saving completed broadcast segments…",
+        "live_duration" to "Maximum recording time",
+        "minutes_value" to "%d min",
+        "live_record_hint" to "Starts at the latest complete segment. Up to 60 minutes / 2 GiB. Use Stop and save in Downloads or the notification; Cancel discards the recording. Separate-audio and encrypted/DRM HLS are unsupported.",
+        "mp3_conversion_hint" to "MP3 is encoded on this device; a higher bitrate cannot improve the source. M4A/WebM preserve the original stream.",
         "operation_failed" to "Could not complete the action. Try again.",
         "home_headline" to "Add a link.\nReady to download.",
         "home_subtitle" to "Choose video or audio and manage your downloads in one place.",

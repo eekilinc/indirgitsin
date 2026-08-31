@@ -74,7 +74,9 @@ fun SettingsScreen() {
     LaunchedEffect(showNotices, showPrivacy, language) {
         if (showNotices || showPrivacy) notices = withContext(Dispatchers.IO) {
             val asset = if (showPrivacy) "PRIVACY_${if (language == "en") "en" else "tr"}.txt" else "THIRD_PARTY_NOTICES.txt"
-            context.assets.open(asset).bufferedReader().use { it.readText() }
+            val text = context.assets.open(asset).bufferedReader().use { it.readText() }
+            if (showPrivacy) text else text + "\n\nLAME LGPL license:\n" +
+                context.assets.open("LICENSE_LAME_LGPL2.txt").bufferedReader().use { it.readText() }
         }
     }
     if (showNotices || showPrivacy) AlertDialog(onDismissRequest = { showNotices = false; showPrivacy = false },
@@ -282,7 +284,8 @@ fun SettingsScreen() {
             action = {
                 Surface(
                     onClick = {
-                        val next = if (audioFormat == "M4A") "WEBM" else "M4A"
+                        val formats = listOf("M4A", "WEBM", "MP3")
+                        val next = formats[(formats.indexOf(audioFormat) + 1).mod(formats.size)]
                         scope.launch { SettingsStore.setAudioFormat(context, next) }
                         Toast.makeText(context, tr(language, "audio_format_toast", next), Toast.LENGTH_SHORT).show()
                     },

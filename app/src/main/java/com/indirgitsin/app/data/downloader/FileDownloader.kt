@@ -28,7 +28,8 @@ object FileDownloader {
         require(option.isDownloadable) { "Bu akış sesli video olarak indirilemiyor. Başka bir kalite seçin." }
         return enqueueData(context, workDataOf("videoId" to video.id, "title" to video.title.take(180),
             "quality" to option.quality, "extension" to option.extension, "audioOnly" to option.isAudioOnly,
-            "codec" to option.codec, "videoOnly" to option.isVideoOnly))
+            "codec" to option.codec, "videoOnly" to option.isVideoOnly, "convertToMp3" to option.convertToMp3,
+            "mp3Bitrate" to option.bitrate, "isLive" to option.isLive, "recordMinutes" to option.recordMinutes.coerceIn(1, 60)))
     }
 
     fun cancel(context: Context, id: UUID) {
@@ -39,7 +40,12 @@ object FileDownloader {
         require(job.state == WorkInfo.State.FAILED && !job.outputData.getString("videoId").isNullOrBlank()) {
             "Bu eski indirme için videoyu yeniden açıp kalite seçin."
         }
-        return enqueueData(context, Data.Builder().putAll(job.outputData).putBoolean("manualRetry", true).build())
+        val data = Data.Builder().putAll(job.outputData).putBoolean("manualRetry", true)
+        if (job.outputData.getBoolean("isLive", false)) {
+            val old = job.outputData.getString("resumeId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            if (old != null && !hasRecording(context, old.toString())) data.putString("resumeId", UUID.randomUUID().toString())
+        }
+        return enqueueData(context, data.build())
     }
 
     suspend fun enqueuePlaylist(context: Context, videos: List<PlaylistVideo>, highQuality: Boolean, audioFormat: String): Int {
@@ -57,10 +63,10 @@ object FileDownloader {
         }
         val unmetered = SettingsStore.unmeteredFlow(context).first()
         val data = Data.Builder().putAll(source)
-            .putString("resumeId", source.getString("resumeId") ?: UUID.randomUUID().toString())
+            .putString("resumeId", source.getString("resumeId")?.let { UUID.fromString(it).toString() } ?: UUID.randomUUID().toString())
             .putBoolean("unmetered", unmetered)
             .putString("folder", SettingsStore.downloadSubfolderFlow(context).first()).build()
-        val selectors = listOf("videoId", "autoSelect", "highQuality", "audioFormat", "quality", "extension", "audioOnly", "codec", "videoOnly")
+        val selectors = listOf("videoId", "autoSelect", "highQuality", "audioFormat", "quality", "extension", "audioOnly", "codec", "videoOnly", "convertToMp3", "isLive", "recordMinutes")
         val identity = selectors.joinToString("|") { key -> "$key=${data.keyValueMap[key]}" }
         val key = TAG + ":" + MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
@@ -70,11 +76,18 @@ object FileDownloader {
             val request = OneTimeWorkRequestBuilder<DownloadWorker>()
                 .setInputData(data).addTag(TAG).addTag("title:${data.getString("title").orEmpty().take(180)}")
                 .addTag("resume:${data.getString("resumeId")}")
+                .addTag(if (data.getBoolean("isLive", false)) "mode:live" else "mode:download")
                 .addTag(if (unmetered) "network:unmetered" else "network:connected")
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(if (unmetered) NetworkType.UNMETERED else NetworkType.CONNECTED).build())
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(
+                    if (data.getBoolean("isLive", false) && data.getBoolean("manualRetry", false) &&
+                        hasRecording(context, requireNotNull(data.getString("resumeId")))) NetworkType.NOT_REQUIRED
+                    else if (unmetered) NetworkType.UNMETERED else NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS).build()
             manager.enqueueUniqueWork(key, ExistingWorkPolicy.KEEP, request).result.get()
             true
         }
     }
+
+    private fun hasRecording(context: Context, resumeId: String): Boolean =
+        listOf("live.properties", "live.properties.bak").any { java.io.File(context.noBackupFilesDir, "downloads/$resumeId/$it").isFile }
 }

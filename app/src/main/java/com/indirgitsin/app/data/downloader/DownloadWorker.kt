@@ -47,6 +47,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
     private val resumeId = inputData.getString("resumeId")?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() } ?: id
     private val directory get() = File(applicationContext.noBackupFilesDir, "downloads/$resumeId")
     private val notificationId = id.hashCode()
+    private var recordingNow = false
     private val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
@@ -77,17 +78,18 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 is IOException -> "Ağ veya dosya hatası: ${e.message.orEmpty().take(160)}"
                 else -> e.message.orEmpty().take(180).ifBlank { "İndirme tamamlanamadı." }
             }
-            if (e is IOException && runAttemptCount < 2) {
+            if (e is IOException && !inputData.getBoolean("isLive", false) && !File(directory, "live.media").exists() && runAttemptCount < 2) {
                 setProgress(workDataOf("name" to title, "stage" to "Yeniden denenecek"))
                 Result.retry()
             } else {
                 showResult("İndirme başarısız", reason)
-                Result.failure(Data.Builder().putAll(inputData).putString("resumeId", resumeId.toString()).putString("name", title).putString("error", reason).build())
+                Result.failure(Data.Builder().putAll(inputData).putString("resumeId", resumeId.toString()).putBoolean("isLive", inputData.getBoolean("isLive", false) || File(directory, "live.media").exists()).putString("name", title).putString("error", reason).build())
             }
         }
     }
 
     private suspend fun performDownload(): Result {
+        if (inputData.getBoolean("isLive", false)) return performLiveDownload()
         val videoId = requireNotNull(inputData.getString("videoId"))
         val info = YoutubeExtractor.extract("https://www.youtube.com/watch?v=$videoId", applicationContext, forceRefresh = runAttemptCount > 0 || inputData.getBoolean("manualRetry", false)).getOrThrow()
         val candidates = info.streams.filter {
@@ -98,6 +100,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
             StreamSelector.preferred(info.streams, inputData.getBoolean("highQuality", true), inputData.getString("audioFormat") ?: "M4A")
         } else candidates.firstOrNull { it.codec == inputData.getString("codec") && it.isVideoOnly == inputData.getBoolean("videoOnly", false) }
             ?: candidates.firstOrNull()) ?: error("Seçilen sesli kalite artık mevcut değil. Videoyu tekrar açıp kalite seçin.")
+        if (option.isLive) return performLiveDownload(option.url)
         val extension = option.extension
         val safeTitle = title.replace(Regex("[^\\p{L}\\p{N}._-]+"), "_").trim('_', '.').take(70).ifBlank { "video" }
         val quality = option.quality.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(24)
@@ -149,7 +152,18 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 } finally { ticker.cancel() }
             }
             currentCoroutineContext().ensureActive()
-            val resultFile = if (option.needsMuxing) {
+            val resultFile = if (option.convertToMp3) {
+                setForeground(foreground("MP3'e dönüştürülüyor", 95))
+                var lastConversionUpdate = 0L
+                AudioMp3Converter.convert(primary, output, option.bitrate) { percent ->
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastConversionUpdate >= 600 || percent == 100) {
+                        lastConversionUpdate = now
+                        setProgressAsync(workDataOf("name" to name, "stage" to "MP3'e dönüştürülüyor • %$percent", "percent" to (95 + percent * 3 / 100)))
+                    }
+                }
+                output
+            } else if (option.needsMuxing) {
                 setProgress(workDataOf("name" to name, "stage" to "Video ve ses birleştiriliyor", "percent" to 96))
                 setForeground(foreground("Video ve ses birleştiriliyor", 96))
                 MediaFileMuxer.mux(primary, audio, output, extension)
@@ -172,6 +186,43 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
         }
     }
 
+    private suspend fun performLiveDownload(manifestUrl: String? = null): Result {
+        check(directory.isDirectory || directory.mkdirs())
+        directory.setLastModified(System.currentTimeMillis())
+        val safeTitle = title.replace(Regex("[^\\p{L}\\p{N}._-]+"), "_").trim('_', '.').take(70).ifBlank { "live" }
+        val name = "${safeTitle}_live_${id.toString().take(8)}.mp4"
+        val output = File(directory, "output.mp4")
+        try {
+            val existing = HlsRecorder.recover(directory)
+            val recording = existing ?: run {
+                val url = manifestUrl ?: YoutubeExtractor.extract("https://www.youtube.com/watch?v=${inputData.getString("videoId")}",
+                    applicationContext, forceRefresh = true).getOrThrow().streams.firstOrNull { it.isLive }?.url
+                    ?: error("Bu yayın şu anda desteklenen canlı HLS akışını sunmuyor.")
+                recordingNow = true
+                setForeground(foreground("Canlı yayın kaydediliyor", 0))
+                setProgress(workDataOf("name" to name, "stage" to "Canlı yayın kaydediliyor", "recording" to true))
+                HlsRecorder.record(url, directory, inputData.getInt("recordMinutes", 15).coerceIn(1, 60)) { bytes, seconds ->
+                    val stage = "Canlı kayıt • ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+                    setProgressAsync(workDataOf("name" to name, "stage" to stage, "bytes" to bytes, "total" to -1L,
+                        "recording" to true, "seconds" to seconds))
+                    notifySafely(notificationId, notification(stage, 0))
+                }
+            }
+            recordingNow = false
+            setForeground(foreground("Canlı kayıt MP4 olarak hazırlanıyor", 96))
+            setProgress(workDataOf("name" to name, "stage" to "Canlı kayıt MP4 olarak hazırlanıyor", "percent" to 96))
+            MediaFileMuxer.remuxCapture(recording.source, output)
+            MediaFileMuxer.validate(output, true, recording.seconds)
+            val uri = DownloadStorage.publish(applicationContext, output, name, "video/mp4",
+                inputData.getString("folder") ?: SettingsStore.getDownloadSubfolderNow(applicationContext))
+            val size = output.length()
+            directory.deleteRecursively()
+            showResult(recording.reason, name)
+            return Result.success(workDataOf("name" to name, "uri" to uri.toString(), "mime" to "video/mp4",
+                "size" to size, "completedAt" to System.currentTimeMillis(), "note" to recording.reason))
+        } finally { recordingNow = false; output.delete() }
+    }
+
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(NotificationChannel(CHANNEL, "İndirmeler", NotificationManager.IMPORTANCE_LOW))
     }
@@ -183,6 +234,12 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
         NotificationCompat.Builder(applicationContext, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle(title).setContentText(stage)
             .setProgress(100, percent, percent == 0).setOngoing(true).setOnlyAlertOnce(true)
+            .apply {
+                if (recordingNow) addAction(android.R.drawable.ic_media_pause, "Durdur ve kaydet",
+                    PendingIntent.getBroadcast(applicationContext, notificationId,
+                        Intent(applicationContext, LiveRecordingReceiver::class.java).putExtra("resumeId", resumeId.toString()),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+            }
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "İptal", WorkManager.getInstance(applicationContext).createCancelPendingIntent(id))
             .build()
 

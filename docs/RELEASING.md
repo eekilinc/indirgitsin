@@ -39,3 +39,7 @@ R8 mapping dosyası, AAB ve ayrıntılı raporlar doğrulama artifact'inde bulun
 Test APK'sı ayrı derlendiği için R8, testlerin ortak framework API'lerine ihtiyaç duyduğunu uygulama derlemesinden göremez. Örneğin `androidx.tracing.Trace` kaldırılırsa test çalıştırıcısı daha testler başlamadan çöker. `app/proguard-instrumentation-api.pro` bu ortak API'leri korur; aynı kurallar dağıtılan APK'da da kullanılır, ayrı bir test uygulaması varyantı üretilmez. Yöntem gövdelerinin optimizasyonu açıktır.
 
 Liste, `tools/instrumentation-keep-rules.py` ile test APK'sının DEX başvuruları ve hedef APK'nın R8 `mapping.txt`/`usage.txt` raporlarından çıkarılır. Başka sınıfa birleştirilen sınıfların bağımsız mapping/usage kaydı olmayabilir; bu nedenle çözümlenemeyen özgün DEX başvuruları da korunur. Test veya framework bağımlılıkları değişince liste yeniden incelenmeli ve imzalı cihaz testi çalıştırılmalıdır. Test aracının kendi sınıfları `proguard-test-rules.pro` ile korunur; bu dosya dağıtılan uygulamanın küçültmesini kapatmaz.
+
+## Native MP3 encoder ve test verisi
+
+NDK `28.2.13676358` ve CMake `3.22.1` gerekir. Encoder kaynakları `app/src/main/cpp/lame/` içindedir; ağdan native binary indirilmez. Yeniden derleme aynı Gradle komutlarını kullanır. Yerel cihaz testinden önce FFmpeg kurulu bir ortamda `bash tools/generate-hls-fixtures.sh` çalıştırın; sentetik test varlıkları APK üretim kaynaklarına dahil edilmez. GitHub Actions bu adımı otomatik yürütür.

@@ -7,7 +7,7 @@
 |---|---|
 | İçerik hakları | Kritik. Uygulama YouTube içeriklerini cihazda saklıyor. Play, izinsiz telifli kopyalamayı teşvik eden uygulamalara izin vermiyor. İzinli kullanım uyarısı tek başına işlevin ve tanıtımın uyumunu kanıtlamaz. |
 | YouTube şartları | İndirme kullanımı hizmetin açık iznine veya YouTube ve ilgili hak sahibinin yazılı iznine bağlı sınırlamalara tabi. Haklar ve kullanım senaryosu ayrıca incelenmeli. |
-| Ana proje lisansı | LICENSE yok. GPL bileşenleri nedeniyle lisans ve kaynak dağıtım yükümlülükleri çözülmeli. [Ayrıntı](LICENSE_STATUS.md). |
+| Ana proje lisansı | Hak sahibi GPL-3.0 seçimini onayladı; LICENSE, LAME kaynakları ve kaynak dağıtım tarifleri eklendi. Bağımlılık bildirimleri korunur. [Ayrıntı](LICENSE_STATUS.md). |
 | Hedef API | 1.1.1 target 34. Bu dal compile/target 36'ya geçirilmiş durumda; Android 16 cihaz testi CI kapsamına eklendi. |
 | 16 KB sayfalar | 1.1.1 APK'sındaki tüm native kütüphanelerin ELF ve ZIP hizalaması uygun çıktı. Yeni final için otomatik kontrol eklendi. Bu statik kontrol, gerçek 16 KB cihaz testinin yerini tutmaz. |
 | Kimlik / imza | Kalıcı stable paket ve sertifika korunuyor. Play App Signing planı ve mağaza anahtarı henüz seçilmedi. |
@@ -32,17 +32,17 @@ Aktarımlar iki işle sınırlandırılmıştır; bir iş içinde video/ses para
 
 Ölçüm betiği `tools/capture-device.py` beş soğuk süreç açılışı, boşta PSS ve ekran görüntüsü toplar. Aynı runner'daki eski/yeni değerler karşılaştırılabilir; emülatör, ağ durumu ve örnek sayısı nedeniyle fiziksel cihaz garantisi değildir. Android vitals verisi, uzun süreli düşük bellek testi, farklı üretici/batarya testleri ve gerçek 16 KB cihaz doğrulaması henüz yok.
 
-MP3 dönüştürme ve HLS/canlı kayıt tamamlanmış sayılmaz. Yeni codec/segment motorları, lisans incelemesi ve uçtan uca cihaz testleri gerekir. Desteklenmeyen özellikler arayüzde varmış gibi gösterilmez.
+MP3 dönüştürme ve sınırlı HLS/canlı kayıt bu dala eklendi. MP3 kodlama tek iş ile sınırlandırılır, PCM tamponu 64 KiB’dir. Canlı kayıt diske parça parça yazılır; en fazla 60 dakika / 2 GiB. Ağ kesintisinde tamamlanan bölüm tekrar deneme ile MP4’e dönüştürülür. Gerçek telefon pil/sıcaklık ölçümleri ve gerçek canlı yayın kabul testi gereklidir. [Kapsam](MP3_LIVE.md).
 
 ## Statik analizde kalan işler
 1.2 adayının Android lint raporunda hata yok; **50 uyarı ve 2 öneri** var. Bunlar ağırlıklı olarak bağımlılık sürümü önerileri, yerel sayı biçimlendirmesi, kullanılmayan kaynaklar ve KTX/Compose iyileştirmeleri. Bu nedenle “sıfır uyarı” veya tüm optimizasyonların tamamlandığı iddia edilmez.
 
 API 36 mevcut Play hedefini karşılar; lint'in en yeni Android sürümünü öneren `OldTargetApi` uyarısı ayrı konudur. YouTube alan adı projeye ait olmadığı için `AppLinkWarning` uyarısını gidermek amacıyla sahte alan doğrulaması eklenmedi. Bağlantı yapıştırma/paylaşma yolu korunuyor. Bağımlılıklar sürüm numarasını büyütmek amacıyla topluca yükseltilmedi; her güncelleme ayrıca derleme ve cihaz doğrulaması gerektirir.
 
-## İmzalı adayın ölçülmüş sonucu
+## MP3/canlı kayıt öncesi adayın ölçülmüş sonucu
 [CI 113](https://github.com/eekilinc/indirgitsin/actions/runs/33383131109) tüm doğrulamalardan geçti. APK 16,81 MB'dan **4,15 MB**'a indi; aynı Android 14 emülatöründe beş soğuk açılışın ortancası **801 → 609 ms**, tek boşta PSS örneği **54.617 → 33.449 KiB** oldu. İmzalı APK üzerinde altı test ve 1.1.1 üzerine kurulum başarılıdır. [Ayrıntılı kanıt ve sınırlar](VALIDATION.md).
 
 Bu sonuç indirme hızı, gerçek telefon belleği veya pil tüketimi garantisi değildir. 16 KB kontrolü statiktir; gerçek 16 KB ortam testi henüz yoktur. Public final ve mağaza kararı yukarıdaki açık koşullara bağlı kalır.
 
 ## Mağaza kararı
-Önce içerik hakları ve ürünün kullanım şekli, ardından proje lisansı çözülmeli. Sonra Play Console beyanları, gerçek cihaz testleri ve gerekiyorsa mağaza için ayrı dağıtım tasarımı hazırlanmalı. Mevcut YouTube işlevi bu çalışma kapsamında sessizce kaldırılmadı; **Play Store yayın işlemi yapılmadı**.
+Ana lisans seçimi tamamlandı. İçerik hakları ve ürünün kullanım şekli ayrıca değerlendirilmelidir. Sonra Play Console beyanları, gerçek cihaz testleri ve gerekiyorsa mağaza için ayrı dağıtım tasarımı hazırlanmalı. Mevcut YouTube işlevi bu çalışma kapsamında sessizce kaldırılmadı; **Play Store yayın işlemi yapılmadı**.
