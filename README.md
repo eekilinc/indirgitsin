@@ -51,6 +51,11 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 - TR/EN çevrimdışı gizlilik politikası.
 - Android 16 hedefi, optimize final APK/AAB ve daha geniş cihaz doğrulaması.
 
+<p align="center">
+  <img src="docs/assets/home-android14.png" alt="İndir Gitsin yeni ana sayfa — gerçek Android 14 emülatör görüntüsü" width="280">
+</p>
+<p align="center"><sub>1.2 geliştirme adayı · Android 14 emülatörü · gerçek uygulama görüntüsü</sub></p>
+
 ## Kurulum
 
 1. **[Son final sürümünü](https://github.com/eekilinc/indirgitsin/releases/latest)** açın; APK dosyasını indirin. **GitHub hesabı gerekmez.**

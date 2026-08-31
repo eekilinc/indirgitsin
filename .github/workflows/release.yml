@@ -13,6 +13,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -181,7 +182,7 @@ jobs:
       - name: Build and check signed release
         run: |
           chmod +x gradlew
-          ./gradlew :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease --stacktrace
+          ./gradlew :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease :app:assembleReleaseAndroidTest --stacktrace
       - name: Reserve disk space and enable KVM
         run: |
           sudo rm -rf /usr/share/dotnet

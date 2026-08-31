@@ -5,6 +5,11 @@
 # Preserve the JavaScript bridge and serialized cipher configuration in optimized builds.
 -keep class com.zemer.cipher.** { *; }
 
+# Keep persisted worker names and the media API exercised from the separate instrumented APK.
+# UI/framework implementation code can still be shrunk and optimized.
+-keep,allowoptimization class com.indirgitsin.app.data.downloader.** { public *; }
+-keep,allowoptimization class com.indirgitsin.app.data.model.** { public *; }
+
 # Rhino uses reflection for its JavaScript runtime. Match the upstream NewPipe approach.
 # https://github.com/TeamNewPipe/NewPipe/blob/dev/app/proguard-rules.pro
 -keep class org.mozilla.javascript.** { *; }
