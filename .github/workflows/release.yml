@@ -138,7 +138,6 @@ jobs:
     permissions:
       contents: write
     env:
-      RELEASE_STORE_FILE: ${{ runner.temp }}/distribution.p12
       RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -162,6 +161,8 @@ jobs:
             exit 1
           fi
           umask 077
+          RELEASE_STORE_FILE="$RUNNER_TEMP/distribution.p12"
+          echo "RELEASE_STORE_FILE=$RELEASE_STORE_FILE" >> "$GITHUB_ENV"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RELEASE_STORE_FILE"
       - name: Build and check signed release
         run: |
