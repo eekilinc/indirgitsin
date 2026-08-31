@@ -3,6 +3,9 @@
 ## MP3
 Video bağlantısını açıp **Ses** sekmesinden MP3 128/192/320 kbps seçin. Kaynak AAC/Opus ses indirilir, Android codec'i PCM'e çözer, LAME gerçek MPEG Layer III kareleri üretir. Dosya uzantısı değiştirilerek MP3 taklidi yapılmaz. Mono/stereo desteklenir; çok kanallı ve şifreli ses reddedilir. Dönüşüm kayıplıdır ve işlemci/batarya kullanır; 320 kbps düşük kaliteli kaynağı iyileştirmez. Kaynak sesi aynen saklamak için M4A/WebM seçin.
 
+## Kapak ve oynatma
+Yeni MP3’lerde kapak, başlık ve sanatçı dosyaya gömülür; M4A/WebM için kapak uygulamada çevrimdışı tutulur. [Kapak ve tam ekran rehberi](PLAYBACK.md).
+
 ## Canlı yayın
 Desteklenen YouTube canlı bağlantısında **Canlı kayıt** görünür. 5/15/30/60 dakika seçilir. Uygulamadan veya bildirimden **Durdur ve kaydet**, tamamlanan parçaları yeniden kodlamadan tek MP4 yapar. **İptal** kaydı siler. En fazla 60 dakika veya 2 GiB; disk alanı azaldığında daha erken sonlanabilir. Geçmiş yayın arşivini değil en yeni tamamlanan parçayı kaydeder; birkaç saniye gecikme normaldir. Durdurma sırasında süren ağ isteğinin zaman aşımı 30 saniyeye kadar beklenebilir.
 
@@ -13,4 +16,4 @@ Ağ veya süreç kesintisinde tamamlanan parçalar özel uygulama alanında tutu
 ## Doğrulama
 Birim testleri HLS URL/byte-range/DRM/süre doğrulamasını, master listede birleşik akış seçimini, son canlı parçadan başlamayı, manuel durmayı ve kesintiden kurtarmayı kapsar. Sentetik AVC/AAC TS ve fMP4 dosyaları CI'da FFmpeg ile üretilir. Cihaz testleri bu kayıtların ses/görüntüsünü AOSP yazılım codec’leriyle yeniden çözer, süre ve senkronu denetler. Bu seçim emülatörün Goldfish video servisindeki aralıklı çökmeyi ayırır; normal video/ses birleştirme testi varsayılan cihaz codec’iyle çalışmaya devam eder. Hiçbir medya testi atlanmaz. MP3 testleri mono/stereo kaynakların 128/192/320 kbps çıktılarını gerçek codec ile çözer; hatalı çıktıların silindiğini kontrol eder. Bunlar gerçek YouTube erişimi testi değildir.
 
-Telefonda kabul: kısa bir izinli videoyu 192 kbps MP3 olarak kaydedip oynatın; izinli canlı yayını en az bir dakika kaydedip durdurun; çıkan MP4'te ses/görüntü ve süreyi kontrol edin. İkinci canlı kayıtta ağı kesin, hata sonrası yeniden deneyip önceki bölümün kurtarıldığını doğrulayın. Son olarak iptal edilen kaydın kitaplığa eklenmediğini kontrol edin. Bu aday için fiziksel cihaz kabulü henüz yapılmadı.
+Telefonda kabul: kısa bir izinli videoyu 192 kbps MP3 olarak kaydedip oynatın; izinli canlı yayını en az bir dakika kaydedip durdurun; çıkan MP4'te ses/görüntü ve süreyi kontrol edin. İkinci canlı kayıtta ağı kesin, hata sonrası yeniden deneyip önceki bölümün kurtarıldığını doğrulayın. Son olarak iptal edilen kaydın kitaplığa eklenmediğini kontrol edin. Kullanıcı 1.2.0-dev.118 adayında indirme ve MP3 dönüşümünün telefonunda çalıştığını doğruladı. Bu bildirim bütün canlı kesinti/kurtarma ve üretici koşullarının ölçüldüğü anlamına gelmez. Yeni kapak/tam ekran işlevlerinin kabulü için [oynatıcı rehberine](PLAYBACK.md) bakın.

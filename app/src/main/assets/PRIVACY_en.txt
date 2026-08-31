@@ -11,6 +11,8 @@ Files
 Completed files are in the shared Download folder and can be accessed by other apps with permission. Uninstalling the app may not remove them; delete them from Downloads or a file manager.
 Partial transfers stay in private, non-backed-up app storage. Successful transfers are cleaned up. Inactive parts older than seven days are removed on a subsequent app launch. Settings also lets you delete inactive partial downloads.
 
+Audio covers and title/artist metadata are kept in private, non-backed-up storage, limited to 256 entries. Deleting a file inside the app also removes its cover; clearing cache does not. Artwork and tags embedded in MP3 travel with the shared file. Private M4A/WebM covers are removed when the app is uninstalled or its data is cleared.
+
 Network services
 YouTube/Google servers receive requests to resolve links, transfer media and load thumbnails. They can receive your IP address, requested video/playlist identifier and request/device information. The cipher component may use a WebView and YouTube verification requests, which can create local web data. Google's own policy applies: https://policies.google.com/privacy
 GitHub API is used for release checks; GitHub files in ZemerTeam/zemer-cipher provide cipher configuration. GitHub receives IP addresses and request information: https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement

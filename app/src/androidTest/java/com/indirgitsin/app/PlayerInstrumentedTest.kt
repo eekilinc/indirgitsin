@@ -60,12 +60,18 @@ class PlayerInstrumentedTest {
 
     @Test fun videoFullscreenAndRecreationKeepSeekPositionAndBackRestoresBars() {
         val file = File(context.cacheDir, "video-player-${UUID.randomUUID()}.mp4")
-        instrumentation.context.assets.open("live/capture-fmp4.mp4").use { input -> file.outputStream().use { input.copyTo(it) } }
+        val source = File(context.cacheDir, "${file.name}.source")
+        try {
+            instrumentation.context.assets.open("live/capture-fmp4.mp4").use { input -> source.outputStream().use { input.copyTo(it) } }
+            // Exercise the seekable MP4 actually saved by the app, not the unfinalized HLS input.
+            kotlinx.coroutines.runBlocking { com.indirgitsin.app.data.downloader.MediaFileMuxer.remuxCapture(source, file) }
+        } finally { source.delete() }
         try {
             launch(file).use { scenario ->
                 waitFor("play_pause")
                 compose.onNodeWithTag("play_pause").performClick()
                 compose.onNodeWithTag("player_seek").performSemanticsAction(SemanticsActions.SetProgress) { assertTrue(it(.5f)) }
+                screenshot("video-seek")
                 // A paused midpoint remains unchanged through both rotation and Activity recreation.
                 compose.onNodeWithText("00:04").assertIsDisplayed()
                 compose.onNodeWithTag("fullscreen_toggle").performClick()

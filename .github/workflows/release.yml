@@ -107,15 +107,16 @@ jobs:
           emulator-boot-timeout: 300
           disable-animations: true
           script: |
-            ./gradlew :app:connectedDebugAndroidTest --stacktrace
-            adb pull /sdcard/Android/data/com.indirgitsin.app.preview/files/player-evidence app/build/reports/player-evidence
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.additionalTestOutputDir=/sdcard/Android/data/com.indirgitsin.app.preview/files/player-evidence --stacktrace
             adb install -r -g app/build/outputs/apk/debug/app-debug.apk
             python3 tools/capture-device.py com.indirgitsin.app.preview app/build/reports/device-evidence
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: device-reports-api-${{ matrix.api-level }}
-          path: app/build/reports/
+          path: |
+            app/build/reports/
+            app/build/outputs/connected_android_test_additional_output/
 
   preview-release:
     needs: [validate, device-test]
@@ -213,7 +214,6 @@ jobs:
           disable-animations: true
           script: |
             bash tools/run-release-device-tests.sh
-            adb pull /sdcard/Android/data/com.indirgitsin.app.stable/files/player-evidence app/build/reports/player-evidence
             curl --fail --location --retry 3 https://github.com/eekilinc/indirgitsin/releases/download/v1.1.1/indir-gitsin-1.1.1.apk --output "$RUNNER_TEMP/baseline.apk"
             echo "3959296c9d211e8d0c93b55189a83b9b36aa55dbb47b145489696c07ab71ccb5  $RUNNER_TEMP/baseline.apk" | sha256sum --check
             adb install -r -g "$RUNNER_TEMP/baseline.apk"
@@ -249,6 +249,7 @@ jobs:
             app/build/outputs/mapping/releaseAndroidTest/
             app/build/outputs/apk/androidTest/release/*.apk
             app/build/outputs/androidTest-results/
+            app/build/outputs/connected_android_test_additional_output/
             indir-gitsin-*.apk
             SHA256SUMS.txt
             indir-gitsin-*-source.zip

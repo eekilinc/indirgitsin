@@ -3,7 +3,7 @@
 set -uo pipefail
 mkdir -p app/build/reports/release-device-diagnostics
 timeout 10s adb logcat -b crash -c || true
-timeout --kill-after=15s 8m ./gradlew :app:connectedReleaseAndroidTest --stacktrace &
+timeout --kill-after=15s 8m ./gradlew :app:connectedReleaseAndroidTest -Pandroid.testInstrumentationRunnerArguments.additionalTestOutputDir=/sdcard/Android/data/com.indirgitsin.app.stable/files/player-evidence --stacktrace &
 test_pid=$!
 crashed=false
 while kill -0 "$test_pid" 2>/dev/null; do
