@@ -71,7 +71,11 @@ android {
         compose = true
     }
     packaging {
-        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // Android has no JSR-223 ScriptEngineManager; NewPipe uses Rhino directly.
+            excludes += "/META-INF/services/javax.script.ScriptEngineFactory"
+        }
     }
 }
 
