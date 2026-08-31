@@ -21,7 +21,7 @@ Bu makinedeki önbellek ile SDK gerektirmeyen kontroller tools/check-core.ps1 ü
 
 Kullanıcı 1.0.94-preview ve ardından 1.1.1 final sürümlerinde sesli video indirmenin telefonda çalıştığını ve hızlı olduğunu
 31 Ağustos 2026'da doğruladı. Bu bildirim tüm kalite/cihaz/ağ senaryolarının test edildiği anlamına gelmez.
-1.1.0 finalde birleştirme/aktarım motoru korunur; kuyruk ve arayüz değişiklikleri ayrıca test edilir.
+1.2 adayında yeniden kodlamadan birleştirme motoru korunur; aktarıma devam ve arayüz değişiklikleri ayrıca test edilir.
 
 ## SDK olan ortamda
 
@@ -40,7 +40,11 @@ MediaFileMuxerInstrumentedTest:
 DownloadQueueInstrumentedTest gerçek WorkManager kuyruğunda yinelenen isteği, tarifesiz ağ kısıtını,
 kontrollü hatadan yeniden denemeyi, güncel ağ ayarını ve iptal sonrası yeniden eklemeyi doğrular.
 Aktarım kontrollü bir test worker'ıyla hata verir; dış YouTube ağına bağımlı değildir.
-StartupInstrumentedTest ana ekranın açılıp RESUMED durumuna geldiğini doğrular.
+StartupInstrumentedTest ana ekranın açılıp RESUMED durumuna geldiğini ve küçültülmüş APK'da Rhino'nun
+yansıma yoluyla yüklenip JavaScript/JSON çalıştırabildiğini doğrular.
+Kuyruk testi, etkin işin parçalarının temizlikte korunduğunu ve süresi dolan etkin olmayan parçaların silindiğini de kontrol eder.
+HomeScreenInstrumentedTest, gerçek Activity üzerinde bağlantı girişi/temizleme ve düğmenin etkinleşmesini doğrular.
+Bu altı cihaz testi kontrollü medya kullanır; gerçek YouTube indirmesini veya uzun süreli ağ/batarya koşullarını doğrulamaz.
 
 CI yapılandırması bu cihaz testlerini API 29, 34 ve 36 emülatörlerinde çalıştırır ve release işini sonuçlarına bağlar.
 Yayınlanan ön sürümün açıklamasındaki Build bağlantısı, o APK'ya ait test sonuçlarını gösterir.
@@ -96,7 +100,7 @@ cipher alt modülünün sabitlenmiş sürümü dahil edilerek üretilir; yerel �
 - Cihazın codec ve işletim sistemi desteği gerçek dosyayla kontrol edilmelidir.
 
 ## 1.2 geliştirme doğrulaması
-- MediaTransferTest: ağ kesintisi, değişen ETag, Range yok sayılması, doğrulayıcı eksikliği, tamamlanmış parçanın kullanılması, yarım kuyruğun kesilmesi, bozuk metadata ve farklı URL kimliği.
+- MediaTransferTest: ağ kesintisi, değişen ETag, Range yok sayılması, doğrulayıcı eksikliği, tamamlanmış parçanın kullanılması, yarım parçanın kesilmesi, bozuk metadata ve farklı URL kimliği; ayrıca kaynakta bildirilen boyuta uymayan tam/kısmi yanıtların reddedilmesi. Toplam 10 aktarım testi.
 - HomeScreenInstrumentedTest: gerçek Activity üzerinde bağlantı girişi ve düğmenin etkinleşmesi; YouTube'a ağ isteği başlatmaz.
 - İmzalı aday: R8/kaynak küçültme, APK/AAB üretimi, 16 KB ELF/ZIP denetimi, Android 14'te 1.1.1 üzerine kurulum.
 - Açılış/PSS ölçümü: tools/capture-device.py; eski ve yeni APK aynı CI emülatöründe. Gerçek telefon performansının yerine geçmez.

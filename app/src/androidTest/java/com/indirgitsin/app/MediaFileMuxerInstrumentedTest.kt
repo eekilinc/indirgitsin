@@ -20,6 +20,8 @@ import kotlin.math.sin
 
 @RunWith(AndroidJUnit4::class)
 class MediaFileMuxerInstrumentedTest {
+    @get:org.junit.Rule val timeout = org.junit.rules.Timeout.seconds(60)
+
     @Test fun separateVideoAndAudioKeepBothTracksAndTimestamps() = runBlocking {
         val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "mux-test-${UUID.randomUUID()}").apply { mkdirs() }
         try {

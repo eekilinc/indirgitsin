@@ -147,13 +147,12 @@ jobs:
             indir-gitsin-*.apk
             SHA256SUMS.txt
 
-  release:
-    needs: [validate, device-test]
+  signed-release:
     if: (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-preview')) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
-      contents: write
+      contents: read
     env:
       RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -200,7 +199,7 @@ jobs:
           emulator-boot-timeout: 300
           disable-animations: true
           script: |
-            ./gradlew :app:connectedReleaseAndroidTest --stacktrace
+            bash tools/run-release-device-tests.sh
             curl --fail --location --retry 3 https://github.com/eekilinc/indirgitsin/releases/download/v1.1.1/indir-gitsin-1.1.1.apk --output "$RUNNER_TEMP/baseline.apk"
             echo "3959296c9d211e8d0c93b55189a83b9b36aa55dbb47b145489696c07ab71ccb5  $RUNNER_TEMP/baseline.apk" | sha256sum --check
             adb install -r -g "$RUNNER_TEMP/baseline.apk"
@@ -233,8 +232,29 @@ jobs:
             app/build/outputs/apk/release/*.apk
             app/build/outputs/bundle/release/*.aab
             app/build/outputs/mapping/release/
+            app/build/outputs/mapping/releaseAndroidTest/
+            app/build/outputs/apk/androidTest/release/*.apk
+            app/build/outputs/androidTest-results/
+            indir-gitsin-*.apk
+            SHA256SUMS.txt
             indir-gitsin-*-source.zip
             certificate.txt
+      - name: Remove runner signing material
+        if: always()
+        run: rm -f "$RELEASE_STORE_FILE"
+
+  release:
+    needs: [validate, device-test, signed-release]
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-preview')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: signed-release-validation
+      - name: Check assets from the tested signed build
+        run: sha256sum --check SHA256SUMS.txt
       - name: Publish signed final APK
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
@@ -245,6 +265,9 @@ jobs:
           fail_on_unmatched_files: true
           body: |
             ## Final sürüm
+            - Bağlantı girişini öne çıkaran yeni ana sayfa ve özgün indirme simgesi.
+            - Kesintiden sonra doğrulanmış HTTP parçalarından devam ve etkin olmayan yarım dosyaları temizleme.
+            - Android 16 hedefi, R8/kaynak küçültme, public güncelleme önbelleği ve uygulama içi gizlilik politikası.
             - Video ve ses paralel indirilir, yeniden kodlamadan tek dosyada birleştirilir.
             - İndirme hızı ve tahmini kalan süre gösterilir.
             - Başarısız işler yeniden denenebilir; aynı video ve kalite aktifken tekrar kuyruğa eklenmez.
@@ -252,8 +275,8 @@ jobs:
             - Dosyaları tarih/ad/boyuta göre sıralama; dosya ve geçmiş silmeden önce onay.
             - Güncelleme erişim hataları artık yanlışlıkla “güncel” gösterilmez.
 
-            **Kurulum:** APK kalıcı anahtarla imzalanmıştır. `com.indirgitsin.app.stable` kimliğiyle eski/test uygulamalarının yanına kurulur; onları kaldırmanız gerekmez. Ayarlar ve geçmiş ayrı başlar. Sonraki final sürümleri aynı anahtarla bunun üzerine güncellenebilir.
-            Önceki uygulamanın dosyaları telefonda korunur; Android izinleri nedeniyle final uygulamasında hepsi otomatik görünmeyebilir.
+            **Kurulum:** APK kalıcı anahtarla imzalanmıştır; `com.indirgitsin.app.stable` kimliği korunur. 1.1.1 final üzerine güncellenebilir; bu kurulum yolu CI'da doğrulanır. Mevcut final uygulamasını kaldırmayın.
+            Tarihi/test paketlerinden ayrı kurulur; bu farklı paketlerde ayarlar ve geçmiş ayrı kalır. Önceki dosyalar telefonda korunur; Android izinleri nedeniyle hepsi otomatik görünmeyebilir.
 
             **Doğrulama:** Birim testleri ve lint; Android 10/14/16 üzerinde ses–görüntü birleştirme/çözme, kuyruk/yeniden deneme ve açılış testleri; imzalı final APK üzerinde Android 14 cihaz testleri; imza sertifikası doğrulaması.
             Önceki test sürümünün gerçek telefonda sesli video indirdiği kullanıcı tarafından doğrulandı. Yeni sürümün gerçek YouTube testi cihazda ayrıca yapılmalıdır.
@@ -267,6 +290,3 @@ jobs:
             indir-gitsin-*.apk
             indir-gitsin-*-source.zip
             SHA256SUMS.txt
-      - name: Remove runner signing material
-        if: always()
-        run: rm -f "$RELEASE_STORE_FILE"

@@ -13,6 +13,8 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class HomeScreenInstrumentedTest {
+    @get:Rule(order = 0) val timeout = org.junit.rules.Timeout.seconds(60)
+
     @get:Rule val compose = createEmptyComposeRule()
 
     @Test fun linkEntryEnablesResolveWithoutStartingNetworkWork() {

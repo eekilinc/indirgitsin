@@ -13,6 +13,8 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class StartupInstrumentedTest {
+    @get:org.junit.Rule val timeout = org.junit.rules.Timeout.seconds(60)
+
     @Test fun rhinoRuntimeSurvivesReleaseShrinking() {
         // Reflective entry also checks that R8 preserves the JavaScript runtime's public names.
         val contextClass = Class.forName("org.mozilla.javascript.Context")

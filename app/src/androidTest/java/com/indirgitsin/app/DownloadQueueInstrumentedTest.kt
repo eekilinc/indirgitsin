@@ -19,6 +19,8 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class DownloadQueueInstrumentedTest {
+    @get:org.junit.Rule val timeout = org.junit.rules.Timeout.seconds(60)
+
     @Test fun duplicateNetworkConstraintFailureRetryAndCancellation() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val factory = object : WorkerFactory() {

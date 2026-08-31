@@ -15,6 +15,7 @@
 | Gizlilik | TR/EN uygulama içi politika eklendi. Kalıcı public URL, geliştirici iletişim kanalı ve üçüncü taraf hizmetleri kapsayan Data safety beyanı başvuru öncesi gözden geçirilmeli. |
 | İzinler / arka plan | MediaStore ve dataSync ön plan hizmeti var. Play Console hizmet kullanım beyanı/demosu, uzun indirmelerde Android kotaları ve üretici güç tasarrufu testleri eksik. |
 | Mağaza hazırlığı | Hesap doğrulama, gerekli test süreci, içerik derecelendirmesi, hedef kitle, ekran görüntüleri ve mağaza açıklaması henüz yapılmadı. |
+| Erişilebilirlik | Yeni giriş alanında etiketler ve dokunma hedefleri var. TalkBack, büyük yazı, tablet/katlanabilir ekran ve tüm tema durumları için tam kabul testi yapılmadı. |
 | Performans | R8/kaynak küçültme, sınırlı eşzamanlı aktarım, küçük akış tamponları, update önbelleği ve yarım dosya temizliği var. Gerçek telefon yük/batarya/ANR ölçümü tamamlanmış değil. |
 
 ## Güncel resmi kurallar
@@ -32,6 +33,11 @@ Aktarımlar iki işle sınırlandırılmıştır; bir iş içinde video/ses para
 Ölçüm betiği `tools/capture-device.py` beş soğuk süreç açılışı, boşta PSS ve ekran görüntüsü toplar. Aynı runner'daki eski/yeni değerler karşılaştırılabilir; emülatör, ağ durumu ve örnek sayısı nedeniyle fiziksel cihaz garantisi değildir. Android vitals verisi, uzun süreli düşük bellek testi, farklı üretici/batarya testleri ve gerçek 16 KB cihaz doğrulaması henüz yok.
 
 MP3 dönüştürme ve HLS/canlı kayıt tamamlanmış sayılmaz. Yeni codec/segment motorları, lisans incelemesi ve uçtan uca cihaz testleri gerekir. Desteklenmeyen özellikler arayüzde varmış gibi gösterilmez.
+
+## Statik analizde kalan işler
+1.2 adayının Android lint raporunda hata yok; **50 uyarı ve 2 öneri** var. Bunlar ağırlıklı olarak bağımlılık sürümü önerileri, yerel sayı biçimlendirmesi, kullanılmayan kaynaklar ve KTX/Compose iyileştirmeleri. Bu nedenle “sıfır uyarı” veya tüm optimizasyonların tamamlandığı iddia edilmez.
+
+API 36 mevcut Play hedefini karşılar; lint'in en yeni Android sürümünü öneren `OldTargetApi` uyarısı ayrı konudur. YouTube alan adı projeye ait olmadığı için `AppLinkWarning` uyarısını gidermek amacıyla sahte alan doğrulaması eklenmedi. Bağlantı yapıştırma/paylaşma yolu korunuyor. Bağımlılıklar sürüm numarasını büyütmek amacıyla topluca yükseltilmedi; her güncelleme ayrıca derleme ve cihaz doğrulaması gerektirir.
 
 ## Mağaza kararı
 Önce içerik hakları ve ürünün kullanım şekli, ardından proje lisansı çözülmeli. Sonra Play Console beyanları, gerçek cihaz testleri ve gerekiyorsa mağaza için ayrı dağıtım tasarımı hazırlanmalı. Mevcut YouTube işlevi bu çalışma kapsamında sessizce kaldırılmadı; **Play Store yayın işlemi yapılmadı**.
