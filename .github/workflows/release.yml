@@ -3,7 +3,7 @@ name: Validate and release Android app
 on:
   pull_request:
   push:
-    branches: [main, master]
+    branches: [main, master, 'codex/**']
     tags: ['v*.*.*']
   workflow_dispatch:
 
@@ -14,18 +14,18 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
       - run: chmod +x gradlew
       - name: Unit tests and lint
         run: ./gradlew :app:testDebugUnitTest :app:lintDebug :cipher:library:testDebugUnitTest --stacktrace
@@ -39,11 +39,11 @@ jobs:
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
           "$APKSIGNER" verify --verbose app/build/outputs/apk/debug/app-debug.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: debug-testing-only
           path: app/build/outputs/apk/debug/*.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: validation-reports
@@ -57,12 +57,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [29, 34]
+        include:
+          - api-level: 29
+            target: default
+          - api-level: 34
+            target: default
+          - api-level: 36
+            target: google_apis
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
@@ -78,20 +84,24 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - run: chmod +x gradlew
-      - uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
           arch: x86_64
           # API 29 enforces a larger image minimum, so disk space is also reserved above.
           disk-size: 2048M
           emulator-boot-timeout: 300
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
-      - uses: actions/upload-artifact@v4
+          script: |
+            ./gradlew :app:connectedDebugAndroidTest --stacktrace
+            adb install -r -g app/build/outputs/apk/debug/app-debug.apk
+            python3 tools/capture-device.py com.indirgitsin.app.preview app/build/reports/device-evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: device-reports-api-${{ matrix.api-level }}
-          path: app/build/reports/androidTests/
+          path: app/build/reports/
 
   preview-release:
     needs: [validate, device-test]
@@ -100,30 +110,30 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: debug-testing-only
           path: apk
       - name: Prepare tested APK and checksum
         run: |
-          mv apk/app-debug.apk "indir-gitsin-1.0.${GITHUB_RUN_NUMBER}-preview.apk"
+          mv apk/app-debug.apk "indir-gitsin-1.2.0-dev.${GITHUB_RUN_NUMBER}-preview.apk"
           sha256sum indir-gitsin-*.apk > SHA256SUMS.txt
       - name: Publish test prerelease
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          tag_name: v1.0.${{ github.run_number }}-preview
+          tag_name: v1.2.0-dev.${{ github.run_number }}-preview
           target_commitish: ${{ github.sha }}
-          name: İndir Gitsin 1.0.${{ github.run_number }} — Test
+          name: İndir Gitsin 1.2.0-dev.${{ github.run_number }} — Test
           prerelease: true
           make_latest: false
           fail_on_unmatched_files: true
           body: |
-            Ses ve görüntüyü ayrı indirip tek dosyada birleştiren yeni akışın test sürümü.
+            Yeni ana sayfa, doğrulanmış parçalardan indirmeye devam ve Android 16 hedefi için test sürümü.
 
             **Kurulum:** Aşağıdaki APK'yı indirip kurun. “İndir Gitsin Test” ayrı bir uygulama olarak kurulur; mevcut uygulama ve verileri korunur.
             Bu APK debug anahtarıyla imzalanmış bir ön sürümdür. Sonraki test sürümünü yüklerken yalnızca test uygulamasını kaldırmanız gerekebilir.
 
-            **Otomatik doğrulama:** Kotlin/JUnit ve cipher testleri, Android lint, APK imza kontrolü, Android 10 ve 14 emülatörlerinde gerçek AAC/AVC birleştirme ve çözme testleri.
+            **Otomatik doğrulama:** Kotlin/JUnit ve cipher testleri, Android lint, APK imza kontrolü, Android 10, 14 ve 16 emülatörlerinde gerçek AAC/AVC birleştirme ve çözme testleri.
             **Telefonda deneyin:** 360p ve 1080p video indirin; sesin ve görüntünün tek dosyada bulunduğunu, uygulamadan çıkınca indirme durumunu ve iptali kontrol edin. Gerçek YouTube indirmesi cihazda ayrıca doğrulanmalıdır.
 
             Commit: ${{ github.sha }}
@@ -134,7 +144,7 @@ jobs:
 
   release:
     needs: [validate, device-test]
-    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-preview')
+    if: (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-preview')) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -145,15 +155,15 @@ jobs:
       RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_TEST_BUILD_TYPE: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
       - name: Prepare permanent distribution signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -169,7 +179,7 @@ jobs:
       - name: Build and check signed release
         run: |
           chmod +x gradlew
-          ./gradlew :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --stacktrace
+          ./gradlew :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease --stacktrace
       - name: Reserve disk space and enable KVM
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -177,7 +187,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Test the signed release on Android 14
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 34
           arch: x86_64
@@ -186,31 +196,43 @@ jobs:
           disable-animations: true
           script: |
             ./gradlew :app:connectedReleaseAndroidTest --stacktrace
+            curl --fail --location --retry 3 https://github.com/eekilinc/indirgitsin/releases/download/v1.1.1/indir-gitsin-1.1.1.apk --output "$RUNNER_TEMP/baseline.apk"
+            echo "3959296c9d211e8d0c93b55189a83b9b36aa55dbb47b145489696c07ab71ccb5  $RUNNER_TEMP/baseline.apk" | sha256sum --check
+            adb install -r -g "$RUNNER_TEMP/baseline.apk"
+            python3 tools/capture-device.py com.indirgitsin.app.stable app/build/reports/baseline-evidence
             adb install -r -g app/build/outputs/apk/release/app-release.apk
             adb shell am start -W -n com.indirgitsin.app.stable/com.indirgitsin.app.MainActivity > app/build/reports/release-launch.txt
             cat app/build/reports/release-launch.txt
             grep -q '^Status: ok' app/build/reports/release-launch.txt
             sleep 2
             adb exec-out screencap -p > app/build/reports/release-home.png
+            python3 tools/capture-device.py com.indirgitsin.app.stable app/build/reports/release-evidence
       - name: Verify permanent certificate and prepare release assets
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
           "$APKSIGNER" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk > certificate.txt
           cat certificate.txt
           python3 tools/verify-certificate.py certificate.txt docs/release-certificate.sha256
-          cp app/build/outputs/apk/release/app-release.apk "indir-gitsin-${GITHUB_REF_NAME#v}.apk"
-          python3 tools/package-source.py "indir-gitsin-${GITHUB_REF_NAME#v}-source.zip"
+          python3 tools/check-native-pages.py app/build/outputs/apk/release/app-release.apk --output app/build/reports/native-pages.json
+          VERSION="1.2.0-dev.${GITHUB_RUN_NUMBER}"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
+          cp app/build/outputs/apk/release/app-release.apk "indir-gitsin-$VERSION.apk"
+          python3 tools/package-source.py "indir-gitsin-$VERSION-source.zip"
           sha256sum indir-gitsin-*.apk indir-gitsin-*-source.zip > SHA256SUMS.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: signed-release-validation
           path: |
             app/build/reports/
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/mapping/release/
+            indir-gitsin-*-source.zip
             certificate.txt
       - name: Publish signed final APK
-        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           name: İndir Gitsin ${{ github.ref_name }} — Final
           prerelease: false
@@ -228,11 +250,11 @@ jobs:
             **Kurulum:** APK kalıcı anahtarla imzalanmıştır. `com.indirgitsin.app.stable` kimliğiyle eski/test uygulamalarının yanına kurulur; onları kaldırmanız gerekmez. Ayarlar ve geçmiş ayrı başlar. Sonraki final sürümleri aynı anahtarla bunun üzerine güncellenebilir.
             Önceki uygulamanın dosyaları telefonda korunur; Android izinleri nedeniyle final uygulamasında hepsi otomatik görünmeyebilir.
 
-            **Doğrulama:** Birim testleri ve lint; Android 10/14 üzerinde ses–görüntü birleştirme/çözme, kuyruk/yeniden deneme ve açılış testleri; imzalı final APK üzerinde Android 14 cihaz testleri; imza sertifikası doğrulaması.
+            **Doğrulama:** Birim testleri ve lint; Android 10/14/16 üzerinde ses–görüntü birleştirme/çözme, kuyruk/yeniden deneme ve açılış testleri; imzalı final APK üzerinde Android 14 cihaz testleri; imza sertifikası doğrulaması.
             Önceki test sürümünün gerçek telefonda sesli video indirdiği kullanıcı tarafından doğrulandı. Yeni sürümün gerçek YouTube testi cihazda ayrıca yapılmalıdır.
 
-            APK, SHA256SUMS.txt ve cipher alt modülünü içeren kaynak kod arşivi aşağıdadır. Depo özel olduğu için GitHub hesabınızla giriş yapmanız gerekir.
-            MP3 dönüştürme, canlı yayın kaydı ve bayt düzeyinde kaldığı yerden devam henüz desteklenmez.
+            APK, SHA256SUMS.txt ve cipher alt modülünü içeren kaynak kod arşivi aşağıdadır. Depo ve sürümler herkese açıktır; indirmek için GitHub hesabı gerekmez.
+            Doğrulanmış HTTP parçalarından devam desteklenir; dosya kimliği doğrulanamazsa güvenle baştan başlanır. MP3 dönüştürme ve canlı yayın kaydı desteklenmez.
 
             Commit: ${{ github.sha }}
             Build: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

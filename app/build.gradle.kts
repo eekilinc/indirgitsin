@@ -5,11 +5,11 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-// Versiyon GitHub ile otomatik senkron: tag v1.0.X ise X, yoksa GITHUB_RUN_NUMBER, yoksa 1
+// Tags name stable versions; CI run numbers keep Android update version codes increasing.
 val gitTagVersion = System.getenv("GITHUB_REF_NAME")?.removePrefix("v")?.takeIf { it.matches(Regex("""\d+\.\d+\.\d+.*""")) }
 val runNumberVersion = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
 val appVersionCode = runNumberVersion ?: 1
-val appVersionName = gitTagVersion ?: "1.0.$appVersionCode"
+val appVersionName = gitTagVersion ?: "1.2.0-dev.$appVersionCode"
 val releaseStore = System.getenv("RELEASE_STORE_FILE")
 val releaseStorePassword = System.getenv("RELEASE_STORE_PASSWORD")
 val releaseAlias = System.getenv("RELEASE_KEY_ALIAS")
@@ -18,13 +18,13 @@ val releaseSigningReady = listOf(releaseStore, releaseStorePassword, releaseAlia
 
 android {
     namespace = "com.indirgitsin.app"
-    compileSdk = 35
+    compileSdk = 36
     testBuildType = System.getenv("ANDROID_TEST_BUILD_TYPE") ?: "debug"
 
     defaultConfig {
         applicationId = "com.indirgitsin.app"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -46,7 +46,8 @@ android {
             // A permanent identity, separate from historical APKs signed with disposable debug keys.
             applicationIdSuffix = ".stable"
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("distribution")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -90,7 +91,7 @@ dependencies {
     // Networking and persistent downloads
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.work:work-runtime-ktx:2.10.5")
 
     // zemer-cipher: YouTube cipher + PoToken (composite build from cipher/ submodule)
     implementation("com.zemer:cipher")
@@ -119,9 +120,11 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.12.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
-    androidTestImplementation("androidx.work:work-testing:2.9.1")
+    androidTestImplementation("androidx.work:work-testing:2.10.5")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }
 
 val checkReleaseSigning by tasks.registering {

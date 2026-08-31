@@ -7,7 +7,7 @@ ile ses izi bulunmalı; ses yoksa işlem başarılı gösterilmemeli.
 
 - Üretim Kotlin sınıflarını kullanan 30 regresyon kontrolü geçti.
 - cipher/tools/tools.test.mjs içindeki 26 test geçti.
-- Kotlin PSI ile 41 Kotlin dosyasının sözdizimi kontrol edildi.
+- Kotlin PSI ile kaynak sözdizimi kontrol edildi; bu kontrol Android tip kontrolü değildir.
 - Gradle 8.13, help --offline göreviyle değiştirilmiş yapılandırmayı başarıyla yükledi.
 - checkReleaseSigning görevi, eksik anahtar durumunda beklendiği gibi yayını engelledi.
 - Android SDK tanımlı değil. SDK indirme izni verilmediği için SDK kurulmadı.
@@ -19,7 +19,7 @@ Bu makinedeki önbellek ile SDK gerektirmeyen kontroller tools/check-core.ps1 ü
 
 ## Önceki sürümün gerçek cihaz sonucu
 
-Kullanıcı 1.0.94-preview sürümünde sesli video indirmenin telefonda çalıştığını ve hızlı olduğunu
+Kullanıcı 1.0.94-preview ve ardından 1.1.1 final sürümlerinde sesli video indirmenin telefonda çalıştığını ve hızlı olduğunu
 31 Ağustos 2026'da doğruladı. Bu bildirim tüm kalite/cihaz/ağ senaryolarının test edildiği anlamına gelmez.
 1.1.0 finalde birleştirme/aktarım motoru korunur; kuyruk ve arayüz değişiklikleri ayrıca test edilir.
 
@@ -42,7 +42,7 @@ kontrollü hatadan yeniden denemeyi, güncel ağ ayarını ve iptal sonrası yen
 Aktarım kontrollü bir test worker'ıyla hata verir; dış YouTube ağına bağımlı değildir.
 StartupInstrumentedTest ana ekranın açılıp RESUMED durumuna geldiğini doğrular.
 
-CI yapılandırması bu cihaz testlerini API 29 ve 34 emülatörlerinde çalıştırır ve release işini sonuçlarına bağlar.
+CI yapılandırması bu cihaz testlerini API 29, 34 ve 36 emülatörlerinde çalıştırır ve release işini sonuçlarına bağlar.
 Yayınlanan ön sürümün açıklamasındaki Build bağlantısı, o APK'ya ait test sonuçlarını gösterir.
 
 ## Gerçek cihaz kabul listesi
@@ -69,9 +69,9 @@ Yayınlanan ön sürümün açıklamasındaki Build bağlantısı, o APK'ya ait 
 | Sil / uygulama içi oynat / paylaş | Doğru URI; silmek için onay gerekir; iptal dosyayı korur |
 | Hız / tahmini kalan | İki aktarımın toplamını gösterir; bilinmeyen boyutta süre uydurulmaz |
 | Tarifesiz ağ açık, mobil veri tarifeli | İş bekler; uygun ağ gelince başlar |
-| Başarısız indirmede yeniden dene | Güncel bağlantı çözülür, baştan kuyruğa alınır |
+| Başarısız indirmede yeniden dene | Güncel bağlantı çözülür; doğrulanmış parçalar korunur |
 | Dosya sıralama | En yeni, ad, boyut sıraları arama/filtre ile birlikte çalışır |
-| Özel GitHub veya bağlantı hatası | Güncel iddiası yerine erişim açıklaması ve GitHub bağlantısı |
+| Public GitHub veya bağlantı hatası | Giriş gerekmeden kontrol; hata halinde güncel iddiası yok |
 
 ## Final yayın kapıları
 
@@ -84,13 +84,23 @@ açılış çıktısında `Status: ok` bulunmadan yayın sürdürülmez.
 
 Kalıcı anahtar GitHub Actions secrets üzerinden sağlanır; paket kimliği `.stable` olur.
 Eksik imza, hatalı sertifika veya başarısız doğrulama final yayınını durdurur.
-Debug cihaz testleri API 29/34 üzerinde; ek imzalı release cihaz testi API 34 üzerinde çalışır.
+Debug cihaz testleri API 29/34/36 üzerinde; ek imzalı release cihaz testi API 34 üzerinde çalışır.
 APK ve kaynak ZIP için SHA256SUMS.txt yayımlanır. Kaynak arşivi yalnızca Git'in izlediği dosyalardan,
 cipher alt modülünün sabitlenmiş sürümü dahil edilerek üretilir; yerel özel anahtar dahil edilmez.
 
 ## Bilinen sınırlar
 
 - MP3 kodlama ve HLS/canlı kayıt yok.
-- Her kesintide bayt düzeyinde resume yok; iş tekrar başlayabilir.
+- Doğrulanmış tam HTTP parçalarından devam vardır. Kesilen son parça veya doğrulanamayan kaynak baştan alınır.
 - YouTube erişim/PoToken kısıtları tüm videolar için başarı garantisi vermez.
 - Cihazın codec ve işletim sistemi desteği gerçek dosyayla kontrol edilmelidir.
+
+## 1.2 geliştirme doğrulaması
+- MediaTransferTest: ağ kesintisi, değişen ETag, Range yok sayılması, doğrulayıcı eksikliği, tamamlanmış parçanın kullanılması, yarım kuyruğun kesilmesi, bozuk metadata ve farklı URL kimliği.
+- HomeScreenInstrumentedTest: gerçek Activity üzerinde bağlantı girişi ve düğmenin etkinleşmesi; YouTube'a ağ isteği başlatmaz.
+- İmzalı aday: R8/kaynak küçültme, APK/AAB üretimi, 16 KB ELF/ZIP denetimi, Android 14'te 1.1.1 üzerine kurulum.
+- Açılış/PSS ölçümü: tools/capture-device.py; eski ve yeni APK aynı CI emülatöründe. Gerçek telefon performansının yerine geçmez.
+- Yarım indirme temizliğinde etkin işler ve ortak Download dosyaları korunmalı.
+- Yeni hedef API nedeniyle Android 16'da kenar boşlukları, klavye ve geri düğmesi ayrıca kontrol edilmeli.
+
+Bu dalın kesin sonucu, commit'e ait GitHub Actions raporudur. Yeni medya motorunun gerçek YouTube/ağ kesintisi kabul testi telefonda ayrıca yapılmalıdır.

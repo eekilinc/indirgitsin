@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 
 object FileDownloader {
     const val TAG = "media_download"
-    private val enqueueLock = Mutex()
+    internal val enqueueLock = Mutex()
 
     // Persist stable selectors only: CDN URLs expire and may exceed WorkManager's Data limit.
     suspend fun enqueue(context: Context, video: VideoInfo, option: StreamOption): Boolean {
@@ -57,6 +57,7 @@ object FileDownloader {
         }
         val unmetered = SettingsStore.unmeteredFlow(context).first()
         val data = Data.Builder().putAll(source)
+            .putString("resumeId", source.getString("resumeId") ?: UUID.randomUUID().toString())
             .putBoolean("unmetered", unmetered)
             .putString("folder", SettingsStore.downloadSubfolderFlow(context).first()).build()
         val selectors = listOf("videoId", "autoSelect", "highQuality", "audioFormat", "quality", "extension", "audioOnly", "codec", "videoOnly")
@@ -68,6 +69,7 @@ object FileDownloader {
             if (manager.getWorkInfosForUniqueWork(key).get().any { !it.state.isFinished }) return@withLock false
             val request = OneTimeWorkRequestBuilder<DownloadWorker>()
                 .setInputData(data).addTag(TAG).addTag("title:${data.getString("title").orEmpty().take(180)}")
+                .addTag("resume:${data.getString("resumeId")}")
                 .addTag(if (unmetered) "network:unmetered" else "network:connected")
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(if (unmetered) NetworkType.UNMETERED else NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS).build()

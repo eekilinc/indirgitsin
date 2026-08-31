@@ -1,0 +1,25 @@
+İndir Gitsin — Gizlilik politikası
+Güncelleme: 31 Ağustos 2026
+
+Geliştirici/proje hesabı: eekilinc
+Kaynak: https://github.com/eekilinc/indirgitsin
+
+Cihazdaki veriler
+Uygulama hesabı oluşturulmaz. Eklenmiş bağlantılar, video başlıkları, indirme geçmişi ve ayarlar cihazda tutulur. Son 50 geçmiş kaydı arayüzde gösterilir; geçmiş siz temizleyene veya uygulama verilerini silene kadar saklanabilir. Geçmişi Kitaplık/Ayarlar üzerinden silebilirsiniz. Ayarlar ve geçmiş Android yedekleme kurallarında bulut ve cihaz aktarımından hariç tutulur.
+
+Dosyalar
+Tamamlanan dosyalar ortak Download klasöründedir. Erişim izni olan uygulamalar bunları görebilir. Uygulamayı kaldırmak bu dosyaları mutlaka silmez; İndirilenler veya dosya yöneticisiyle silebilirsiniz.
+Yarım aktarımlar uygulamanın özel, yedeklenmeyen alanındadır. Başarılı indirmede temizlenir. Etkin olmayan 7 günden eski parçalar uygulamanın sonraki açılışında temizlenir. Ayarlardan etkin olmayan yarım indirmeleri ayrıca silebilirsiniz.
+
+Ağ hizmetleri
+Bağlantı çözümleme, video/ses aktarımı ve küçük resimler için YouTube/Google sunucularına erişilir. Bu sunucular IP adresi, istenen video/oynatma listesi kimliği ve bağlantı/cihaz bilgilerini alabilir. Cipher bileşeni gerekirse WebView ve YouTube'un doğrulama isteklerini kullanır; hizmetin oluşturduğu yerel web verileri bulunabilir. Google'ın kendi gizlilik koşulları geçerlidir: https://policies.google.com/privacy
+Sürüm kontrolü için GitHub API; cipher yapılandırması için ZemerTeam/zemer-cipher deposundaki GitHub dosyaları kullanılır. GitHub IP adresini ve istek bilgilerini alır: https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement
+Video kimlikleri uygulama tarafından halka açık Cobalt/Piped/Invidious servislerine gönderilmez. Uygulamaya geliştiriciye ait analitik veya reklam SDK'sı eklenmemiştir. Bu, ağ hizmetlerinin hiç veri işlemediği anlamına gelmez.
+
+İzinler
+İnternet ve ağ durumu aktarım için; ön plan hizmeti uzun indirmeler için; bildirim izni ilerleme bildirimleri için kullanılır. Android 7–9'da ortak klasöre kayıt için depolama izni gerekir. Android 10+ sürümlerde MediaStore kullanılır. Kamera, mikrofon, kişiler veya konum izni istenmez.
+
+Kontrol ve iletişim
+Önbelleği Ayarlar'dan; tüm özel uygulama verilerini Android uygulama ayarlarından temizleyebilirsiniz. Panoya ilişkin öneriler cihazda işlenir; video bağlantısını çözümlemeyi seçtiğinizde ilgili hizmete istek gönderilir.
+Genel gizlilik soruları: https://github.com/eekilinc/indirgitsin/issues
+Bu alan herkese açıktır; kişisel verilerinizi, parolalarınızı veya özel bağlantılarınızı göndermeyin. Geliştirici üçüncü taraf sunucularındaki verilere erişemez; bu hizmetlerle ilgili talepler kendi gizlilik kanallarına iletilmelidir.

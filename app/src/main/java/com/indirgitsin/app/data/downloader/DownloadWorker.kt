@@ -44,6 +44,8 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
         private const val CHANNEL = "media_downloads"
     }
     private val title = inputData.getString("title") ?: "Video"
+    private val resumeId = inputData.getString("resumeId")?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() } ?: id
+    private val directory get() = File(applicationContext.noBackupFilesDir, "downloads/$resumeId")
     private val notificationId = id.hashCode()
     private val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -57,6 +59,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 performDownload()
             }
         } catch (e: CancellationException) {
+            if (stopReason == androidx.work.WorkInfo.STOP_REASON_CANCELLED_BY_APP) directory.deleteRecursively()
             throw e
         } catch (e: Exception) {
             val reason = when (e) {
@@ -69,7 +72,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 Result.retry()
             } else {
                 showResult("İndirme başarısız", reason)
-                Result.failure(Data.Builder().putAll(inputData).putString("name", title).putString("error", reason).build())
+                Result.failure(Data.Builder().putAll(inputData).putString("resumeId", resumeId.toString()).putString("name", title).putString("error", reason).build())
             }
         }
     }
@@ -90,8 +93,8 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
         val quality = option.quality.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(24)
         val name = "${safeTitle}_${quality}_${id.toString().take(8)}.$extension"
         // Keep active files away from the user-clearable thumbnail/cache directory.
-        val directory = File(applicationContext.noBackupFilesDir, "downloads/$id")
         check(directory.isDirectory || directory.mkdirs()) { "Geçici indirme klasörü oluşturulamadı." }
+        directory.setLastModified(System.currentTimeMillis())
         val primary = File(directory, "primary.part")
         val audio = File(directory, "audio.part")
         val output = File(directory, "output.$extension")
@@ -99,6 +102,8 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
         val audioBytes = AtomicLong()
         val primaryTotal = AtomicLong(-1)
         val audioTotal = AtomicLong(if (option.needsMuxing) -1 else 0)
+        val primaryInitial = AtomicLong(-1)
+        val audioInitial = AtomicLong(if (option.needsMuxing) -1 else 0)
         val lastUpdate = AtomicLong()
         val estimator = TransferProgress(SystemClock.elapsedRealtime())
         fun progress() {
@@ -108,21 +113,26 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
             val downloaded = primaryBytes.get() + audioBytes.get()
             val total = if (primaryTotal.get() < 0 || audioTotal.get() < 0) -1 else primaryTotal.get() + audioTotal.get()
             val percent = if (total > 0) (downloaded * 95 / total).toInt().coerceIn(0, 95) else 0
-            val estimate = estimator.update(now, downloaded, total)
+            val resumed = primaryInitial.get().coerceAtLeast(0) + audioInitial.get().coerceAtLeast(0)
+            val estimate = estimator.update(now, (downloaded - resumed).coerceAtLeast(0), if (total < 0) -1 else total - resumed)
             setProgressAsync(workDataOf("name" to name, "stage" to "İndiriliyor", "bytes" to downloaded,
                 "total" to total, "percent" to percent, "speed" to estimate.bytesPerSecond, "eta" to (estimate.remainingSeconds ?: -1)))
             val speed = android.text.format.Formatter.formatShortFileSize(applicationContext, estimate.bytesPerSecond)
             notifySafely(notificationId, notification("İndiriliyor • $speed/sn", percent))
+        }
+        fun streamProgress(done: Long, total: Long, bytes: AtomicLong, length: AtomicLong, initial: AtomicLong) {
+            initial.updateAndGet { if (it < 0 || done < it) done else it }
+            bytes.set(done); length.set(total); progress()
         }
         try {
             coroutineScope {
                 val ticker = launch { while (true) { delay(1_000); progress() } }
                 try {
                     val videoJob = async {
-                        MediaTransfer.download(option.url, primary) { done, total -> primaryBytes.set(done); primaryTotal.set(total); progress() }
+                        MediaTransfer.download(option.url, primary, "$videoId|${option.extension}|${option.quality}|${option.codec}") { done, total -> streamProgress(done, total, primaryBytes, primaryTotal, primaryInitial) }
                     }
                     val audioJob = if (option.needsMuxing) async {
-                        MediaTransfer.download(requireNotNull(option.audioUrl), audio) { done, total -> audioBytes.set(done); audioTotal.set(total); progress() }
+                        MediaTransfer.download(requireNotNull(option.audioUrl), audio, "$videoId|audio|${option.audioCodec}") { done, total -> streamProgress(done, total, audioBytes, audioTotal, audioInitial) }
                     } else null
                     videoJob.await()
                     audioJob?.await()
@@ -141,14 +151,14 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
             val folder = inputData.getString("folder") ?: SettingsStore.getDownloadSubfolderNow(applicationContext)
             val mime = DownloadStorage.mime(extension, option.isAudioOnly)
             val uri = DownloadStorage.publish(applicationContext, resultFile, name, mime, folder)
+            val completedSize = resultFile.length()
+            directory.deleteRecursively()
             showResult("İndirme tamamlandı", name)
             return Result.success(workDataOf("name" to name, "uri" to uri.toString(), "mime" to mime,
-                "size" to resultFile.length(), "completedAt" to System.currentTimeMillis()))
+                "size" to completedSize, "completedAt" to System.currentTimeMillis()))
         } finally {
-            primary.delete()
-            audio.delete()
+            // Preserve checked input ranges for WorkManager and manual retries, never a half-muxed output.
             output.delete()
-            directory.delete()
         }
     }
 

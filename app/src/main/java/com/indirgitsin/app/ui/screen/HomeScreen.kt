@@ -4,6 +4,12 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.testTag
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
@@ -62,8 +68,8 @@ fun HomeScreen(
 ) {
     var showSheet by remember { mutableStateOf(false) }
     var selectedVideo by remember { mutableStateOf<VideoInfo?>(null) }
-    var selectedTab by remember { mutableStateOf(0) }
-    var selectedChip by remember { mutableStateOf(0) }
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
+
     val context = LocalContext.current
 
     val doPaste = {
@@ -89,81 +95,57 @@ fun HomeScreen(
     }
 
     Scaffold(
-        topBar = { YtTopBar() },
-        containerColor = MaterialTheme.colorScheme.background
+        topBar = { HomeTopBar() },
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0)
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
-            // Search bar - YouTube search style
-            item {
-                YtSearchBar(
-                    inputUrl = inputUrl,
-                    onInputChange = onInputChange,
-                    onFetch = onFetch,
-                    onPaste = doPaste
-                )
-            }
-
-            // Chips - YouTube filter chips
-            item {
-                YtFilterChips(selectedChip = selectedChip, onChipSelected = { selectedChip = it })
-            }
-
-            // Content area
-            item {
-                Box(Modifier.padding(horizontal = 16.dp).padding(top = 12.dp)) {
-                    AnimatedContent(
-                        targetState = uiState,
-                        transitionSpec = { fadeIn() + scaleIn(initialScale = 0.98f) togetherWith fadeOut() },
-                        label = "state"
-                    ) { state ->
-                        when (state) {
-                            is UiState.Loading -> YtShimmerCard()
-                            is UiState.Error -> YtErrorCard(state.message)
-                            is UiState.Success -> Box {
-                                YtVideoCard(video = state.video, onClick = { showSheet = true })
-                                SmallCloseButton(
-                                    onClick = {
-                                        onClear()
-                                        showSheet = false
-                                        selectedVideo = null
-                                    },
-                                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
-                                )
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(
+                modifier = Modifier.widthIn(max = 720.dp).fillMaxSize().testTag("home"),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                item(key = "intro") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(t("home_headline"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(t("home_subtitle"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                item(key = "input") {
+                    HomeLinkCard(inputUrl, onInputChange, onFetch, doPaste, uiState is UiState.Loading)
+                }
+                if (uiState !is UiState.Idle) {
+                    item(key = "result") {
+                        AnimatedContent(targetState = uiState,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "state"
+                        ) { state ->
+                            when (state) {
+                                is UiState.Loading -> YtShimmerCard()
+                                is UiState.Error -> YtErrorCard(state.message)
+                                is UiState.Success -> Box {
+                                    YtVideoCard(video = state.video, onClick = { showSheet = true })
+                                    SmallCloseButton(onClick = {
+                                        onClear(); showSheet = false; selectedVideo = null
+                                    }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+                                }
+                                is UiState.PlaylistSuccess -> YtPlaylistCard(playlist = state.playlist)
+                                else -> Unit
                             }
-                            is UiState.PlaylistSuccess -> YtPlaylistCard(playlist = state.playlist)
-                            else -> YtEmptyState()
                         }
                     }
                 }
-            }
-
-            // Geçmiş chips
-            item {
-                Box(Modifier.padding(horizontal = 16.dp).padding(top = 16.dp)) {
-                    YtRecentSection(historyDao, onHistoryClick)
+                if (uiState is UiState.Idle) {
+                    item(key = "benefits") { HomeBenefits() }
+                    item(key = "help") { YtHowItWorks() }
+                }
+                item(key = "recent") { YtRecentSection(historyDao, onHistoryClick) }
+                item(key = "rights") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Rounded.Info, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(t("tos_notice"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
-
-            // Nasıl çalışır - YouTube style 3 steps
-            item {
-                Box(Modifier.padding(horizontal = 16.dp).padding(top = 16.dp)) {
-                    YtHowItWorks()
-                }
-            }
-
-            item {
-                Box(Modifier.padding(16.dp)) {
-                    Text(
-                        t("tos_notice"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-}
-        }
         }
     }
 
@@ -175,183 +157,84 @@ fun HomeScreen(
             onDismiss = { showSheet = false },
             onDownload = { opt -> onDownload(selectedVideo!!, opt); showSheet = false },
             onPreview = { /* handled inside sheet now via direct intent */ },
-            filterChip = selectedChip
+            filterChip = 0
         )
     }
 }
 
 @Composable
-private fun YtTopBar() {
-    val context = LocalContext.current
-    Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // YouTube logo
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(width = 32.dp, height = 22.dp).clip(RoundedCornerShape(4.dp))
-                        .background(YtRed),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                }
-                Spacer(Modifier.width(4.dp))
-                Text(t("app_name"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.width(6.dp))
-                Surface(shape = RoundedCornerShape(4.dp), color = YtRed) {
-                    Text("  " + t("premium") + "  ", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
-                }
+private fun HomeTopBar() {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(44.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Download, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(26.dp))
             }
-            Spacer(Modifier.weight(1f))
+        }
+        Column {
+            Text(t("app_name"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Text(t("home_tagline"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun YtPremiumHero() {
-    val gradient = Brush.linearGradient(listOf(Color(0xFF1A1A1A), Color(0xFF2D0B0B)))
-    Box(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp)).background(gradient).padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(shape = CircleShape, color = YtRed, modifier = Modifier.size(40.dp)) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Rounded.Bolt, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(t("premium_fast"), color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleSmall)
-                Text(t("premium_desc"), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
-            }
-            Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
-                Text(" " + t("pro") + " ", color = YtRed, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun YtPremiumBanner() {
-    val context = LocalContext.current
-    val premiumToast = t("premium_toast")
-    val gradient = Brush.horizontalGradient(listOf(Color(0xFFFF0000), Color(0xFFCC0000)))
-    Box(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(12.dp)).background(gradient).clickable { android.widget.Toast.makeText(context, premiumToast, android.widget.Toast.LENGTH_SHORT).show() }.padding(14.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Box(
-                Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Rounded.Bolt, null, tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(t("premium_banner_title"), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                Text(t("premium_banner_sub"), color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
-            }
-            Icon(Icons.Rounded.ArrowForward, null, tint = Color.White, modifier = Modifier.size(18.dp))
-        }
-    }
-}
-
-@Composable
-private fun YtSearchBar(
-    inputUrl: String,
-    onInputChange: (String) -> Unit,
-    onFetch: (String) -> Unit,
-    onPaste: () -> Unit
+private fun HomeLinkCard(
+    inputUrl: String, onInputChange: (String) -> Unit, onFetch: (String) -> Unit,
+    onPaste: () -> Unit, loading: Boolean
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // YouTube search bar style - rounded, dark
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {}) { Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                OutlinedTextField(
-                    value = inputUrl,
-                    onValueChange = onInputChange,
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text(t("search_hint"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent
-                    )
-                )
-                if (inputUrl.isNotBlank()) {
-                    IconButton(onClick = { onInputChange("") }) { Icon(Icons.Rounded.Clear, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) }
+    val canFetch = inputUrl.isNotBlank() && !loading
+    val submit = { if (canFetch) onFetch(inputUrl) }
+    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Rounded.Link, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                Text(t("link_label"), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall)
+            }
+            OutlinedTextField(
+                value = inputUrl, onValueChange = onInputChange,
+                modifier = Modifier.fillMaxWidth().testTag("link_input"),
+                placeholder = { Text("https://youtu.be/…", style = MaterialTheme.typography.bodyMedium) },
+                singleLine = true, shape = RoundedCornerShape(14.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { submit() }),
+                trailingIcon = if (inputUrl.isNotBlank()) { {
+                    IconButton(onClick = { onInputChange("") }) { Icon(Icons.Rounded.Close, t("clear")) }
+                } } else null
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onPaste, enabled = !loading,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp)) {
+                    Icon(Icons.Rounded.ContentPaste, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(t("paste"))
                 }
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(36.dp)) {
-                    IconButton(onClick = { onFetch(inputUrl) }, enabled = inputUrl.isNotBlank(), modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.background, modifier = Modifier.size(18.dp))
-                    }
+                Button(onClick = submit, enabled = canFetch,
+                    modifier = Modifier.weight(1.25f).heightIn(min = 48.dp).testTag("resolve_button"),
+                    shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(horizontal = 10.dp)) {
+                    Icon(Icons.Rounded.ArrowForward, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(t("resolve"), fontWeight = FontWeight.SemiBold)
                 }
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            FilledTonalButton(
-                onClick = onPaste,
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Rounded.ContentPaste, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(t("paste"), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-            }
-            Button(
-                onClick = { onFetch(inputUrl) },
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = YtRed),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                enabled = inputUrl.isNotBlank(),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Rounded.Bolt, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(t("resolve"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-            }
+            Text(t("link_supported"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun YtFilterChips(selectedChip: Int, onChipSelected: (Int) -> Unit) {
-    val chips = listOf(t("all"), t("video"), t("music"), t("shorts"), "4K")
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        chips.forEachIndexed { idx, label ->
-            val selected = idx == selectedChip
-            FilterChip(
-                selected = selected,
-                onClick = { onChipSelected(idx) },
-                label = { Text(label, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.labelMedium) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.onBackground,
-                    selectedLabelColor = MaterialTheme.colorScheme.background,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    labelColor = MaterialTheme.colorScheme.onSurface
-                ),
-                shape = RoundedCornerShape(8.dp),
-                border = null
-            )
+private fun HomeBenefits() {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        listOf(Icons.Rounded.GraphicEq to ("home_av" to "home_av_detail"),
+            Icons.Rounded.HighQuality to ("home_original" to "home_original_detail")).forEach { (icon, keys) ->
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                Column {
+                    Text(t(keys.first), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    Text(t(keys.second), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
 }
@@ -400,15 +283,13 @@ private fun YtEmptyState() {
 @Composable
 private fun YtRecentSection(historyDao: HistoryDao?, onHistoryClick: (String) -> Unit) {
     var recent by remember { mutableStateOf<List<com.indirgitsin.app.data.history.HistoryEntity>>(emptyList()) }
-    val scope = rememberCoroutineScope()
     LaunchedEffect(historyDao) { historyDao?.observeHistory()?.collect { recent = it.take(4) } }
+    if (recent.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(t("recent_title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
-            if (recent.isNotEmpty() && historyDao != null) {
-                TextButton(onClick = { scope.launch { historyDao.clearAll() } }) { Text(t("clear"), style = MaterialTheme.typography.labelSmall) }
-            }
+
         }
         if (recent.isEmpty()) {
             Text(t("recent_empty"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -447,8 +328,8 @@ private fun YtHowItWorks() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(t("how_title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            YtStep("1", t("step_copy"), Icons.Rounded.Link)
-            YtStep("2", t("step_share"), Icons.Rounded.Share)
+            YtStep("1", t("step_link"), Icons.Rounded.Link)
+            YtStep("2", t("step_quality"), Icons.Rounded.Tune)
             YtStep("3", t("step_download"), Icons.Rounded.Download)
         }
     }

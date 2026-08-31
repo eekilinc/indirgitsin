@@ -9,6 +9,8 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -50,6 +52,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         if (Build.VERSION.SDK_INT <= 28 && ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             requestStoragePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
@@ -63,6 +66,11 @@ class MainActivity : ComponentActivity() {
 
         val db = AppDatabase.get(this)
         vm.historyDao = db.historyDao()
+        lifecycleScope.launch {
+            try { com.indirgitsin.app.data.downloader.PartialDownloads.clearInactive(applicationContext, expiredOnly = true) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { /* A maintenance failure must not prevent startup. */ }
+        }
 
         handleIntent(intent)
         checkClipboard()
@@ -130,7 +138,7 @@ class MainActivity : ComponentActivity() {
                     },
                     containerColor = MaterialTheme.colorScheme.background
                 ) { padding ->
-                    Box(Modifier.padding(padding)) {
+                    Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                         AppNavHost(
                             navController = navController,
                             homeViewModel = vm,

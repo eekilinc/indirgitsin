@@ -1,14 +1,8 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- Kirmizi play ikon + yazi -->
-    <path android:fillColor="#E60014" android:pathData="M0,0h108v108h-108z"/>
-    <!-- Beyaz yuvarlak zemin -->
-    <path android:fillColor="#FFFFFF" android:pathData="M54,28 A22,22 0 1,0 54,72 A22,22 0 1,0 54,28 Z"/>
-    <!-- Play ucgeni -->
-    <path android:fillColor="#E60014" android:pathData="M47,38 L70,50 L47,62 Z" android:strokeLineCap="round" android:strokeLineJoin="round"/>
-    <!-- Alt yazi: indir -->
-    <path android:fillColor="#FFFFFF" android:pathData="M28,78 h52 v4 h-52z"/>
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#13151B" android:pathData="M0,0h108v108h-108z"/>
+    <path android:fillColor="#ED334B" android:pathData="M30,22h48q8,0 8,8v48q0,8 -8,8h-48q-8,0 -8,-8v-48q0,-8 8,-8z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M50,33h8v22l8,-8 6,6 -18,18 -18,-18 6,-6 8,8z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M35,73h38v5h-38z"/>
 </vector>

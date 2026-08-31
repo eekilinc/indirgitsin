@@ -55,6 +55,8 @@ fun SettingsScreen() {
     var updateUnavailable by remember { mutableStateOf(false) }
     var confirmHistoryClear by remember { mutableStateOf(false) }
     var showNotices by remember { mutableStateOf(false) }
+    var showPrivacy by remember { mutableStateOf(false) }
+    var confirmPartialClear by remember { mutableStateOf(false) }
     var notices by remember { mutableStateOf("") }
     val autoHigh by SettingsStore.autoHighFlow(context).collectAsState(initial = true)
     val audioFormat by SettingsStore.audioFormatFlow(context).collectAsState(initial = "M4A")
@@ -69,15 +71,29 @@ fun SettingsScreen() {
     val language by SettingsStore.languageFlow(context).collectAsState(initial = "tr")
     var cacheSizeBytes by remember { mutableLongStateOf(0) }
     LaunchedEffect(Unit) { cacheSizeBytes = withContext(Dispatchers.IO) { calcCacheSizeBytes(context) } }
-    LaunchedEffect(showNotices) {
-        if (showNotices) notices = withContext(Dispatchers.IO) {
-            context.assets.open("THIRD_PARTY_NOTICES.txt").bufferedReader().use { it.readText() }
+    LaunchedEffect(showNotices, showPrivacy, language) {
+        if (showNotices || showPrivacy) notices = withContext(Dispatchers.IO) {
+            val asset = if (showPrivacy) "PRIVACY_${if (language == "en") "en" else "tr"}.txt" else "THIRD_PARTY_NOTICES.txt"
+            context.assets.open(asset).bufferedReader().use { it.readText() }
         }
     }
-    if (showNotices) AlertDialog(onDismissRequest = { showNotices = false },
-        title = { Text(t("license")) },
+    if (showNotices || showPrivacy) AlertDialog(onDismissRequest = { showNotices = false; showPrivacy = false },
+        title = { Text(t(if (showPrivacy) "privacy_policy" else "license")) },
         text = { Text(notices, Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) },
-        confirmButton = { TextButton(onClick = { showNotices = false }) { Text(t("close")) } })
+        confirmButton = { TextButton(onClick = { showNotices = false; showPrivacy = false }) { Text(t("close")) } })
+    if (confirmPartialClear) AlertDialog(onDismissRequest = { confirmPartialClear = false },
+        title = { Text(t("partial_clear")) }, text = { Text(t("partial_clear_sub")) },
+        confirmButton = { TextButton(onClick = {
+            confirmPartialClear = false
+            scope.launch {
+                try {
+                    com.indirgitsin.app.data.downloader.PartialDownloads.clearInactive(context)
+                    Toast.makeText(context, tr(language, "partial_cleared"), Toast.LENGTH_SHORT).show()
+                } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (_: Exception) { Toast.makeText(context, tr(language, "operation_failed"), Toast.LENGTH_SHORT).show() }
+            }
+        }) { Text(t("clear")) } },
+        dismissButton = { TextButton(onClick = { confirmPartialClear = false }) { Text(t("cancel")) } })
     if (updateUnavailable) AlertDialog(onDismissRequest = { updateUnavailable = false },
         title = { Text(t("update_unavailable_title")) }, text = { Text(t("update_unavailable_body")) },
         confirmButton = { TextButton(onClick = {
@@ -253,6 +269,11 @@ fun SettingsScreen() {
             }
         )
 
+        PremiumSettingCard(icon = Icons.Rounded.FolderDelete, title = t("partial_clear"), subtitle = t("partial_clear_sub"),
+            action = { TextButton(onClick = { confirmPartialClear = true }) { Text(t("clear")) } })
+        PremiumSettingCard(icon = Icons.Rounded.PrivacyTip, title = t("privacy_policy"), subtitle = t("privacy_sub"),
+            action = { TextButton(onClick = { showPrivacy = true }) { Text(t("open")) } })
+
         // Ses Formatı
         PremiumSettingCard(
             icon = Icons.Rounded.AudioFile,
@@ -283,7 +304,8 @@ fun SettingsScreen() {
                         try {
                             val oldSize = formatByteSize(cacheSizeBytes)
                             cacheSizeBytes = withContext(Dispatchers.IO) {
-                                context.cacheDir.listFiles()?.forEach { f ->
+                                UpdateChecker.clearCache()
+                                context.cacheDir.listFiles()?.filter { it.name != "release-http" }?.forEach { f ->
                                     try { f.deleteRecursively() } catch (_: Exception) {}
                                 }
                                 calcCacheSizeBytes(context)

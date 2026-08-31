@@ -1,136 +1,101 @@
-# İndir Gitsin
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="İndir Gitsin — Bağlantıdan kitaplığına" width="100%">
+</p>
 
-Kotlin ve Jetpack Compose ile yazılmış Android YouTube video/ses indiricisi.
-Android 7.0 (API 24) ve üzeri; compileSdk 35, targetSdk 34.
+<p align="center">
+  <a href="https://github.com/eekilinc/indirgitsin/releases/latest"><img alt="Son final" src="https://img.shields.io/github/v/release/eekilinc/indirgitsin?label=final&amp;color=ed334b&amp;style=flat-square"></a>
+  <a href="https://github.com/eekilinc/indirgitsin/actions/workflows/release.yml"><img alt="CI" src="https://github.com/eekilinc/indirgitsin/actions/workflows/release.yml/badge.svg"></a>
+  <img alt="Android 7 ve üzeri" src="https://img.shields.io/badge/Android-7.0%2B-3ddc84?style=flat-square">
+  <img alt="Kotlin ve Compose" src="https://img.shields.io/badge/Kotlin-Jetpack_Compose-a97bff?style=flat-square">
+</p>
 
-## İndirme akışı
+<p align="center">
+  <strong>Videonu veya sesini seç. İndirmelerini tek yerden yönet.</strong><br>
+  Android için Kotlin ve Jetpack Compose ile geliştirilmiş video/ses indirme yöneticisi.
+</p>
 
-1. YouTube bağlantısı NewPipeExtractor ile çözümlenir. Gerekirse YouTube web yanıtı ve zemer-cipher kullanılır.
-2. Akışın video-only olup olmadığı açıkça belirlenir; çözünürlükten tahmin edilmez.
-3. Ayrı video ve ses gerekiyorsa uyumlu iki dosya paralel indirilir:
-   - MP4: AVC/HEVC + AAC; AV1 için API 34+ gerekir.
-   - WebM: VP8/VP9 + Vorbis; Opus birleştirmek için API 29+ gerekir.
-4. Android MediaMuxer özgün codec bilgilerini ve zaman damgalarını koruyarak birleştirir.
-5. Sonuçta ses ve görüntü izleri kontrol edilir. Ses yoksa indirme başarılı sayılmaz.
-6. Doğrulanmış dosya Download/IndirGitsin veya seçilen alt klasöre kaydedilir.
+<p align="center">
+  <a href="https://github.com/eekilinc/indirgitsin/releases/latest"><strong>↓ Final APK'yı indir</strong></a>
+  · <a href="docs/RELEASING.md">Derleme</a>
+  · <a href="docs/VALIDATION.md">Test rehberi</a>
+  · <a href="docs/PRIVACY.md">Gizlilik</a>
+  · <a href="https://github.com/eekilinc/indirgitsin/issues">Geri bildirim</a>
+</p>
 
-Ses akışları gerçek M4A/WebM formatlarıyla sunulur. Uygulama MP3 dönüştürücü içermez;
-M4A/WebM dosyalarını MP3 olarak yeniden adlandırmaz. HLS/canlı yayın kaydı desteklenmez.
-Desteklenen kalite, videonun sunduğu akışlara ve cihazın codec desteğine bağlıdır.
+> **Yalnızca indirme hakkınız ve ilgili hizmetin izni bulunan içerikleri kullanın.**
+> Proje YouTube/Google ile bağlantılı değildir. Public kaynak kodu veya GitHub yayını, Play Store kabulü anlamına gelmez.
 
-## 1.1.0 final yenilikleri
+## Bir bağlantıdan tek dosyaya
 
-- Son beş saniyenin toplam video/ses aktarım hızı ve tahmini kalan aktarım süresi.
-- Aktif aynı video/kalite/format için yinelenen istek engeli; başarısız işten yeniden deneme.
-- Ayarlardan yalnızca tarifesiz ağ (WorkManager UNMETERED). Varsayılan kapalıdır;
-  değişiklik yeni kuyruğa alınan işlere uygulanır. Yeniden deneme güncel ağ/klasör tercihlerini kullanır.
-- Dosyalarda en yeni/ad/boyut sıralaması, dosya ve geçmiş silmede onay.
-- Özel GitHub deposuna erişilemediğinde yanlış “güncel” sonucu yerine açıklama ve tarayıcı bağlantısı.
-- Uygulama içi bileşen lisans metinleri. Desteklenmeyen arka planda oynatma iddiası kaldırıldı.
+YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevcut sesli video veya ses seçeneklerinden birini seçin. Ayrı video ve ses akışları gerektiğinde paralel indirilir ve **yeniden kodlanmadan** birleştirilir. Sonuçta ses/görüntü izleri doğrulanmadan işlem başarılı sayılmaz.
 
-## Kuyruk ve indirme ekranı
+| Özellik | Nasıl çalışır? |
+|---|---|
+| Sesli video | MP4 veya cihazın desteklediği WebM eşleştirmesi; sessiz çıktıyı başarılı saymaz. |
+| Ses dosyası | Gerçek M4A/WebM akışı; sahte MP3 uzantısı yok. |
+| Kalıcı kuyruk | WorkManager ile iki eşzamanlı iş, iptal ve başarısız işten yeniden deneme. |
+| İlerleme | Toplam video/ses hızı ve tahmini kalan aktarım süresi. |
+| Ağ tercihi | İsteğe bağlı yalnızca tarifesiz ağda indirme. |
+| Dosya yönetimi | Arama, tür filtresi, tarih/ad/boyut sıralaması ve silme onayı. |
+| Kitaplık | Yerel geçmiş ve uygulama içi oynatma. |
+| Görünüm | Türkçe/İngilizce, açık/koyu tema ve vurgu rengi seçimi. |
 
-İndirmeler WorkManager ile kalıcı olarak kuyruğa alınır. Aynı anda en fazla iki indirme işi,
-her iş içinde video ve ses olmak üzere iki akış çalışır. Bildirimden veya İndirilenler ekranından iptal edilebilir.
+## 1.2 hazırlığında
 
-Uygulama süreci kapanırsa WorkManager işi yeniden çalıştırabilir. Yarım dosyadan bayt düzeyinde
-devam etme henüz yoktur: yeniden denemede bağlantı tekrar çözülür ve aktarım baştan başlar.
-Kullanıcının Android ayarlarından zorla durdurması, cihaz/ağ kısıtları ve işletim sistemi
-arka plan sınırlamaları indirmeyi erteleyebilir.
+Çalışan son final **1.1.1**'dir. Bu geliştirme dalındaki değişiklikler final diye sunulmaz:
 
-Android 10+ için MediaStore ve IS_PENDING kullanılır; tamamlanmamış dosyalar normal
-medya listesine çıkarılmaz. Android 7–9 için depolama izni gerekir. Yeni dosyalar,
-önceki indirmelerin üzerine yazmamak için iş kimliği içeren benzersiz ad alır.
-Eski DownloadManager indirmeleri ekranda takip edilmeye devam edilir.
+- Bağlantı girişini öne çıkaran yeni ana sayfa ve özgün indirme simgesi.
+- Kesintiden sonra doğrulanmış 4 MB HTTP parçalarından devam. Dosya kimliği doğrulanamıyorsa güvenli yeniden başlangıç.
+- Etkin olmayan yarım dosyaları temizleme; 7 günden eski parçalar için açılışta bakım.
+- Public GitHub güncelleme kontrolü; otomatik kontrolde altı saatlik aralık ve HTTP önbelleği.
+- TR/EN çevrimdışı gizlilik politikası.
+- Android 16 hedefi, optimize final APK/AAB ve daha geniş cihaz doğrulaması.
 
-Çalma listelerinin devam sayfaları okunur; seçili videolar kalıcı kuyruğa eklenir; zaten aktif olan aynı toplu seçim atlanır.
-Sonsuz radyo/çok büyük listeler için 100 sayfa sınırı vardır.
-Varsayılan kalite, toplu indirmelerde seçimi ve tek video ekranında sıralamayı etkiler.
-Varsayılan ses formatı ses seçeneklerinin sırasını belirler.
+## Kurulum
 
-## Mimari
+1. **[Son final sürümünü](https://github.com/eekilinc/indirgitsin/releases/latest)** açın; APK dosyasını indirin. **GitHub hesabı gerekmez.**
+2. Android'in dosyayı açan tarayıcı/dosya yöneticisi için istediği yükleme iznini verin.
+3. İsterseniz dosyanın SHA-256 değerini aynı yayındaki `SHA256SUMS.txt` ile karşılaştırın.
 
-- UI: Compose, Material 3, Navigation Compose
-- Durum: HomeViewModel + StateFlow; yeni arama eski isteği iptal eder
-- Ağ: NewPipeExtractor, OkHttp, zemer-cipher (cipher/ Git submodule)
-- İndirme: DownloadWorker, MediaTransfer, MediaFileMuxer, DownloadStorage
-- Veri: Room geçmişi, DataStore ayarları, WorkManager iş kayıtları
-- Oynatma: Media3 ExoPlayer; uygulama arka plana geçince duraklatılır
+Final paket kimliği `com.indirgitsin.app.stable` olarak sabittir. 1.1.1 ve sonraki final güncellemeleri aynı imzayı korur. **İndir Gitsin Test** ayrı uygulamadır; test uygulamasını kaldırmak zorunlu değildir.
 
-## Derleme
+## Neden hızlı?
 
-JDK 17 ve Android SDK (platform 35 ve AGP'nin istediği build-tools) gerekir.
+Video ve ses paralel aktarılır. Birleştirme sırasında görüntü yeniden kodlanmaz; kaynak örnekleri zaman damgaları korunarak kopyalanır. Akış tamponları sınırlıdır, dosya bütünü RAM'e yüklenmez. Gerçek hız ağınıza, kaynağa ve cihaza bağlıdır; sabit hız ya da pil ömrü taahhüdü yoktur.
+
+```mermaid
+flowchart LR
+  A[Bağlantı] --> B[Akışları çözümle]
+  B --> C[Video]
+  B --> D[Ses]
+  C --> E[Yeniden kodlamadan birleştir]
+  D --> E
+  E --> F[Ses ve görüntüyü doğrula]
+  F --> G[Download klasörüne kaydet]
+```
+
+## Sınırları açıkça
+
+**MP3 dönüştürme ve HLS/canlı yayın kaydı yoktur.** Kalite, kaynak akışlarına ve cihaz codec desteğine bağlıdır. WebM/Opus birleştirme Android 10+, MP4/AV1 Android 14+ ister. YouTube değişiklikleri veya erişim kısıtları bazı videoları etkileyebilir.
+
+Devam etme, doğrulanmış tam HTTP parçalarını kullanır; kesilen son parça yeniden alınabilir. Tamamlanan dosyalar ortak Download alanındadır. Android'in zorla durdurma, ağ ve arka plan sınırları işlemleri erteleyebilir.
+
+## Geliştirme ve kalite
 
 ```sh
 git clone --recurse-submodules https://github.com/eekilinc/indirgitsin.git
 cd indirgitsin
-# Android Studio ile SDK konumunu ayarlayın veya local.properties içine sdk.dir yazın.
 ./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest :app:lintDebug :cipher:library:testDebugUnitTest
-node --test cipher/tools/tools.test.mjs
 ```
 
-Debug APK: app/build/outputs/apk/debug/app-debug.apk.
-Debug APK yalnızca geliştirme/test içindir; kalıcı dağıtım için kullanılmamalıdır.
-`com.indirgitsin.app.preview` kimliği ve “İndir Gitsin Test” adıyla mevcut uygulamanın yanına kurulur.
+JDK 17, Android SDK 36 ve Android 7.0+ gerekir. UI: Compose/Material 3; veri: Room/DataStore; aktarım: OkHttp/WorkManager; medya: Android MediaMuxer/Media3; çözümleme: NewPipeExtractor ve sabitlenmiş cipher alt modülü.
 
-Bağlı cihaz veya emülatörde gerçek AAC/AVC örneklerini birleştiren testi çalıştırmak için:
+**[Derleme ve imzalama](docs/RELEASING.md)** · **[Doğrulama rehberi](docs/VALIDATION.md)** · **[Yayın hazırlığı ve performans sınırları](docs/PUBLISHING_READINESS.md)**
 
-```sh
-./gradlew :app:connectedDebugAndroidTest
-```
+## Public depo ve lisans
 
-Manuel doğrulama listesi: [docs/VALIDATION.md](docs/VALIDATION.md).
+Hata raporları için [issue şablonunu](https://github.com/eekilinc/indirgitsin/issues/new/choose), güvenlik açıkları için [özel bildirim kanalını](SECURITY.md) kullanın. PR'lar test edilir; imza sırları PR işlerine verilmez.
 
-## İmzalı yayın
+**Ana proje lisansı henüz seçilmemiştir.** Public erişim kendiliğinden yeniden dağıtım lisansı vermez. GPL bileşenleri ve kaynak kodu yükümlülükleri için [lisans durumunu](docs/LICENSE_STATUS.md) okuyun. Ana bağımlılık metinleri uygulamada Ayarlar → Lisans bölümündedir.
 
-Pull request ve main/master push'larında test, lint ve debug derlemesi çalışır.
-Main/master için tüm kontrollerden sonra test APK'sı `v1.0.<run>-preview` GitHub ön sürümünde yayımlanır.
-Yayımlanan dosya doğrulama işinde oluşturulup imzası kontrol edilen APK'nın aynısıdır; SHA-256 özeti de eklenir.
-Kalıcı dağıtım için imzalı GitHub Release, v*.*.* etiketi gönderildiğinde ve doğrulama işleri geçtiğinde oluşturulur.
-
-GitHub Actions secrets:
-
-- ANDROID_KEYSTORE_BASE64: kalıcı dağıtım keystore dosyasının Base64 içeriği
-- ANDROID_KEYSTORE_PASSWORD
-- ANDROID_KEY_ALIAS
-- ANDROID_KEY_PASSWORD
-
-Yerel release derlemesinde aynı bilgiler RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD,
-RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD ortam değişkenleriyle verilir.
-Eksik imzayla release APK üretilmesi engellenir. Anahtar/password dosyalarını Git'e eklemeyin.
-
-Final paket kimliği `com.indirgitsin.app.stable` olarak sabittir. Yeni kalıcı RSA dağıtım anahtarı kullanılır;
-public sertifika parmak izi `docs/release-certificate.sha256` ile CI'da doğrulanır.
-Bu kimlik eski `com.indirgitsin.app` ve `.preview` uygulamalarının yanına kurulur;
-ayarlar/geçmiş ayrı başlar, eski uygulamalar veya dosyalar silinmez.
-Android depolama izinleri nedeniyle eski uygulamanın dosyalarının tamamı yeni uygulamada görünmeyebilir.
-Sonraki final güncellemelerinde **aynı paket kimliği ve aynı anahtar korunmalıdır**.
-Yerel özel anahtar/parola yedeği Git'in dışındaki `.release-signing/` klasöründedir;
-bu klasörü güvenli, şifreli bir konuma yedekleyin. Dosyaları commit/release varlığı yapmayın.
-
-Final işinde release birim testleri/lint, Android 14 üzerinde **imzalı release APK** cihaz testleri,
-sertifika karşılaştırması ve SHA-256 üretimi de yapılır. GitHub Release'e APK, özet dosyası ve
-sabitlenmiş cipher kaynaklarını da içeren kaynak kod ZIP'i eklenir.
-İmza kurulumu: https://docs.github.com/en/rest/guides/encrypting-secrets-for-the-rest-api
-
-GitHub deposu özel kalır. APK içine erişim token'ı eklenmez. Güncellemeleri kontrol etmek veya
-indirmek için GitHub'a giriş yapılmış tarayıcı gerekebilir.
-
-## Gizlilik ve sınırlamalar
-
-Video kimlikleri halka açık Cobalt/Piped/Invidious servislerine gönderilmez.
-YouTube ve thumbnail sunucularına; sürüm kontrolü ve cipher yapılandırması için GitHub'a ağ erişimi yapılır.
-Geçmiş ve ayarlar cihazda saklanır; uygulamanın yedekleme kuralları bunları bulut ve cihaz aktarımından hariç tutar.
-İndirilen dosyalar ortak Downloads alanındadır; erişim hakkı olan diğer uygulamalar bunları görebilir.
-
-YouTube tarafındaki değişiklikler, erişim kısıtları veya codec desteği nedeniyle bazı videolar indirilemeyebilir.
-Yalnızca indirme hakkınız olan içerikleri kullanın.
-
-## Lisans bilgisi
-
-Kök depoda bir LICENSE dosyası bulunmuyor; önceki README'deki MIT ifadesi bu nedenle kaldırıldı.
-cipher/ alt modülü GPL-3.0 lisansını içeriyor; NewPipeExtractor da kendi lisans koşullarına tabidir.
-Bu güncelleme projeyi yeniden lisanslamaz. Ana bağımlılık bildirimleri ve GPL v3/Apache 2.0 metinleri
-`app/src/main/assets/THIRD_PARTY_NOTICES.txt` içinde, uygulamanın ayarlar ekranından çevrimdışı okunabilir.
-Kaynak kod arşivi özel GitHub yayınına eklenir. Herkese açık dağıtımdan önce proje lisansı ayrıca kararlaştırılmalıdır.
+[Katkıda bulunma](CONTRIBUTING.md) · [Gizlilik politikası](docs/PRIVACY.md) · [Güvenlik](SECURITY.md)
