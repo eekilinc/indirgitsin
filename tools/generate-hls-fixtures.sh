@@ -9,4 +9,4 @@ ffmpeg -hide_banner -loglevel error -y -f lavfi -i 'testsrc=size=64x64:rate=24' 
   -hls_segment_filename "$target/ts-%02d.ts" "$target/ts.m3u8"
 cat "$target"/ts-*.ts > "$target/capture.ts"
 ffmpeg -hide_banner -loglevel error -y -i "$target/capture.ts" -c copy -bsf:a aac_adtstoasc \
-  -movflags empty_moov+frag_keyframe+default_base_moof "$target/capture-fmp4.mp4"
+  -movflags empty_moov+frag_keyframe+default_base_moof+delay_moov "$target/capture-fmp4.mp4"

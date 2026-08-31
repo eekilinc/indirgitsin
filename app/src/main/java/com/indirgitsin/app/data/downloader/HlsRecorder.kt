@@ -84,7 +84,7 @@ object HlsRecorder {
                         initialization = segment.initialization
                     }
                     fetch(segment.resource, temporary, httpClient, 64L * 1024 * 1024, allowHttp)
-                    if (output.length() + temporary.length() > MAX_BYTES || directory.usableSpace < temporary.length() + 64L * 1024 * 1024) {
+                    if (output.length() + temporary.length() > MAX_BYTES || directory.usableSpace < temporary.length() + 2 * (output.length() + temporary.length()) + 64L * 1024 * 1024) {
                         reason = "Dosya veya boş alan sınırına ulaşıldı"; break@recording
                     }
                     temporary.inputStream().use { it.copyToOutput(output) }

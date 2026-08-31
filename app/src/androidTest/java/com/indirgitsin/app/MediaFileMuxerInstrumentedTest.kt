@@ -96,6 +96,8 @@ class MediaFileMuxerInstrumentedTest {
             InstrumentationRegistry.getInstrumentation().context.assets.open("live/$asset").use { input ->
                 source.outputStream().use { input.copyTo(it) }
             }
+            assertDecodable(source, "audio/")
+            assertDecodable(source, "video/")
             val output = File(directory, "recording.mp4")
             MediaFileMuxer.remuxCapture(source, output)
             MediaFileMuxer.validate(output, videoRequired = true)
@@ -103,7 +105,8 @@ class MediaFileMuxerInstrumentedTest {
                 assertDecodable(output, prefix)
                 val before = timestamps(source, prefix)
                 val after = timestamps(output, prefix)
-                assertEquals("Capture lost $prefix samples", before.size, after.size)
+                if (prefix == "video/") assertEquals("Capture lost video samples", before.size, after.size)
+                else assertTrue("Capture lost audio samples", after.size >= before.size)
                 assertTrue("Capture was truncated", after.last() - after.first() > 7_500_000)
             }
             val audioStart = timestamps(output, "audio/").first()

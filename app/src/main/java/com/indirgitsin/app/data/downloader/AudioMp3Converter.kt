@@ -59,12 +59,12 @@ object AudioMp3Converter {
                                 if (index >= 0) {
                                     val input = requireNotNull(codec.getInputBuffer(index))
                                     input.clear()
-                                    check(extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED == 0) { "Şifreli ses dönüştürülemiyor." }
                                     val count = extractor.readSampleData(input, 0)
                                     if (count < 0) {
                                         codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                                         inputEnded = true
                                     } else {
+                                        check(extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED == 0) { "Şifreli ses dönüştürülemiyor." }
                                         codec.queueInputBuffer(index, 0, count, extractor.sampleTime, 0)
                                         extractor.advance()
                                     }

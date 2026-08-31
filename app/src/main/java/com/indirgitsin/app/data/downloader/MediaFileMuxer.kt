@@ -24,6 +24,8 @@ object MediaFileMuxer {
             require(video >= 0 && audio >= 0) { "Canlı yayında hem görüntü hem ses bulunamadı." }
             val videoFormat = reader.getTrackFormat(video)
             val audioFormat = reader.getTrackFormat(audio)
+            val adts = audioFormat.containsKey(MediaFormat.KEY_IS_ADTS) && audioFormat.getInteger(MediaFormat.KEY_IS_ADTS) == 1
+            if (adts) audioFormat.setInteger(MediaFormat.KEY_IS_ADTS, 0)
             checkCompatibility(videoFormat.getString(MediaFormat.KEY_MIME).orEmpty(), audioFormat.getString(MediaFormat.KEY_MIME).orEmpty(), "mp4")
             val muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             writer = muxer
@@ -44,11 +46,15 @@ object MediaFileMuxer {
                 val size = reader.readSampleData(buffer, 0)
                 check(size > 0 && reader.sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED == 0) { "Yayın örneği eksik veya şifreli." }
                 val track = reader.sampleTrackIndex
-                info.set(0, size, (reader.sampleTime - firstTime).coerceAtLeast(0),
-                    if (reader.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+                val timestamp = (reader.sampleTime - firstTime).coerceAtLeast(0)
                 buffer.position(0); buffer.limit(size)
-                muxer.writeSampleData(requireNotNull(tracks[track]), buffer, info)
-                counts[track] = counts.getValue(track) + 1
+                val frames = if (track == audio && adts) AdtsFrames.split(buffer, size) else listOf(AdtsFrame(0, size, 0))
+                for (frame in frames) {
+                    info.set(frame.offset, frame.size, timestamp + frame.timeOffsetUs,
+                        if (reader.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+                    muxer.writeSampleData(requireNotNull(tracks[track]), buffer, info)
+                    counts[track] = counts.getValue(track) + 1
+                }
                 reader.advance()
             }
             check(counts.values.all { it > 0 }) { "Canlı kayıt ses veya görüntü içermiyor." }

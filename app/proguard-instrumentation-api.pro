@@ -363,3 +363,7 @@
 -keep class org.jetbrains.annotations.Nullable { *; }
 -keep class org.jmock.core.Constraint { *; }
 -keep class org.mozilla.javascript.Scriptable { *; }
+
+# Shared Kotlin APIs used by MP3 loops and test asset copying.
+-keep class kotlin.coroutines.jvm.internal.Boxing { *; }
+-keep class kotlin.io.ByteStreamsKt { *; }
