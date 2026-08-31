@@ -50,8 +50,12 @@ for line in args.mapping.open(encoding='utf-8'):
         mapping[match[1]] = match[2]
 removed = {line.rstrip(':\r\n') for line in args.usage.open(encoding='utf-8')
            if line.strip() and not line.startswith((' ', '\t', '#'))}
-required = {original for original, renamed in mapping.items() if renamed in external} | (external & removed)
-required = sorted(name for name in required if not name.startswith(('android.', 'java.', 'javax.')))
+# A merged class may appear only as a qualified method owner in mapping.txt,
+# with no top-level mapping or usage entry (for example ViewTreeLifecycleOwner).
+# Preserve unresolved original references as well as reverse-mapped class names.
+renamed_names = set(mapping.values())
+required = {original for original, renamed in mapping.items() if renamed in external} | (external - renamed_names) | (external & removed)
+required = sorted(name for name in required if not name.startswith(('android.', 'java.', 'javax.', 'dalvik.', 'sun.', 'org.xml.', 'org.w3c.')))
 if not required:
     raise SystemExit('No shared APIs found; refusing to replace keep rules.')
 header = '''# Shared APIs referenced by the separately compiled instrumentation APK.

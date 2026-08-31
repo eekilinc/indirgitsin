@@ -68,12 +68,14 @@
 -keep class androidx.compose.ui.input.key.Key { *; }
 -keep class androidx.compose.ui.input.key.Key$Companion { *; }
 -keep class androidx.compose.ui.input.key.KeyEvent_androidKt { *; }
+-keep class androidx.compose.ui.input.key.Key_androidKt { *; }
 -keep class androidx.compose.ui.input.pointer.util.VelocityTracker { *; }
 -keep class androidx.compose.ui.input.pointer.util.VelocityTrackerKt { *; }
 -keep class androidx.compose.ui.layout.AlignmentLine { *; }
 -keep class androidx.compose.ui.layout.LayoutCoordinates { *; }
 -keep class androidx.compose.ui.layout.LayoutCoordinatesKt { *; }
 -keep class androidx.compose.ui.layout.LayoutInfo { *; }
+-keep class androidx.compose.ui.layout.LayoutModifierKt { *; }
 -keep class androidx.compose.ui.layout.Measurable { *; }
 -keep class androidx.compose.ui.layout.MeasurePolicy { *; }
 -keep class androidx.compose.ui.layout.MeasureResult { *; }
@@ -105,6 +107,7 @@
 -keep class androidx.compose.ui.semantics.ScrollAxisRange { *; }
 -keep class androidx.compose.ui.semantics.SemanticsActions { *; }
 -keep class androidx.compose.ui.semantics.SemanticsConfiguration { *; }
+-keep class androidx.compose.ui.semantics.SemanticsConfigurationKt { *; }
 -keep class androidx.compose.ui.semantics.SemanticsNode { *; }
 -keep class androidx.compose.ui.semantics.SemanticsOwner { *; }
 -keep class androidx.compose.ui.semantics.SemanticsOwnerKt { *; }
@@ -122,10 +125,12 @@
 -keep class androidx.compose.ui.text.input.ImeAction$Companion { *; }
 -keep class androidx.compose.ui.text.intl.Locale { *; }
 -keep class androidx.compose.ui.text.intl.LocaleList { *; }
+-keep class androidx.compose.ui.unit.AndroidDensity_androidKt { *; }
 -keep class androidx.compose.ui.unit.Constraints { *; }
 -keep class androidx.compose.ui.unit.Constraints$Companion { *; }
 -keep class androidx.compose.ui.unit.ConstraintsKt { *; }
 -keep class androidx.compose.ui.unit.Density { *; }
+-keep class androidx.compose.ui.unit.DensityKt { *; }
 -keep class androidx.compose.ui.unit.Dp { *; }
 -keep class androidx.compose.ui.unit.Dp$Companion { *; }
 -keep class androidx.compose.ui.unit.DpRect { *; }
@@ -153,6 +158,7 @@
 -keep class androidx.lifecycle.LifecycleEventObserver { *; }
 -keep class androidx.lifecycle.LifecycleObserver { *; }
 -keep class androidx.lifecycle.LifecycleOwner { *; }
+-keep class androidx.lifecycle.ViewTreeLifecycleOwner { *; }
 -keep class androidx.tracing.Trace { *; }
 -keep class androidx.work.Clock { *; }
 -keep class androidx.work.Configuration { *; }
@@ -178,6 +184,7 @@
 -keep class androidx.work.Worker { *; }
 -keep class androidx.work.WorkerFactory { *; }
 -keep class androidx.work.WorkerParameters { *; }
+-keep class androidx.work.WorkerParameters$RuntimeExtras { *; }
 -keep class androidx.work.impl.Processor { *; }
 -keep class androidx.work.impl.Scheduler { *; }
 -keep class androidx.work.impl.StartStopToken { *; }
@@ -242,6 +249,7 @@
 -keep class kotlin.coroutines.ContinuationKt { *; }
 -keep class kotlin.coroutines.CoroutineContext { *; }
 -keep class kotlin.coroutines.CoroutineContext$Element { *; }
+-keep class kotlin.coroutines.CoroutineContext$Element$DefaultImpls { *; }
 -keep class kotlin.coroutines.CoroutineContext$Key { *; }
 -keep class kotlin.coroutines.EmptyCoroutineContext { *; }
 -keep class kotlin.coroutines.intrinsics.IntrinsicsKt { *; }
@@ -328,11 +336,14 @@
 -keep class kotlinx.coroutines.TimeoutCancellationException { *; }
 -keep class kotlinx.coroutines.TimeoutKt { *; }
 -keep class kotlinx.coroutines.YieldContext { *; }
+-keep class kotlinx.coroutines.YieldContext$Key { *; }
+-keep class kotlinx.coroutines.YieldKt { *; }
 -keep class kotlinx.coroutines.channels.BufferOverflow { *; }
 -keep class kotlinx.coroutines.channels.Channel { *; }
 -keep class kotlinx.coroutines.channels.ChannelKt { *; }
 -keep class kotlinx.coroutines.debug.internal.DebugProbesImpl { *; }
 -keep class kotlinx.coroutines.internal.CoroutineExceptionHandlerImplKt { *; }
+-keep class kotlinx.coroutines.internal.CoroutineExceptionHandlerImpl_commonKt { *; }
 -keep class kotlinx.coroutines.internal.ExceptionSuccessfullyProcessed { *; }
 -keep class kotlinx.coroutines.internal.MainDispatcherFactory { *; }
 -keep class kotlinx.coroutines.internal.MainDispatcherFactory$DefaultImpls { *; }
@@ -346,6 +357,9 @@
 -keep class kotlinx.coroutines.selects.SelectClause0 { *; }
 -keep class kotlinx.coroutines.selects.SelectClause1 { *; }
 -keep class kotlinx.coroutines.selects.SelectImplementation { *; }
+-keep class org.easymock.EasyMock { *; }
+-keep class org.easymock.IArgumentMatcher { *; }
 -keep class org.jetbrains.annotations.NotNull { *; }
 -keep class org.jetbrains.annotations.Nullable { *; }
+-keep class org.jmock.core.Constraint { *; }
 -keep class org.mozilla.javascript.Scriptable { *; }

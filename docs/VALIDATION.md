@@ -107,4 +107,4 @@ cipher alt modülünün sabitlenmiş sürümü dahil edilerek üretilir; yerel �
 - Yarım indirme temizliğinde etkin işler ve ortak Download dosyaları korunmalı.
 - Yeni hedef API nedeniyle Android 16'da kenar boşlukları, klavye ve geri düğmesi ayrıca kontrol edilmeli.
 
-Bu dalın kesin sonucu, commit'e ait GitHub Actions raporudur. Yeni medya motorunun gerçek YouTube/ağ kesintisi kabul testi telefonda ayrıca yapılmalıdır.
+Bu dalın kesin sonucu, commit'e ait GitHub Actions raporudur. Birleştirme motoru korunmuştur; yeni aktarım/devam davranışının gerçek YouTube ve ağ kesintisi kabul testi telefonda ayrıca yapılmalıdır.
