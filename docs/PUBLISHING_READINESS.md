@@ -35,9 +35,13 @@ Aktarımlar iki işle sınırlandırılmıştır; bir iş içinde video/ses para
 MP3 dönüştürme ve sınırlı HLS/canlı kayıt bu dala eklendi. MP3 kodlama tek iş ile sınırlandırılır, PCM tamponu 64 KiB’dir. Canlı kayıt diske parça parça yazılır; en fazla 60 dakika / 2 GiB. Ağ kesintisinde tamamlanan bölüm tekrar deneme ile MP4’e dönüştürülür. Gerçek telefon pil/sıcaklık ölçümleri ve gerçek canlı yayın kabul testi gereklidir. [Kapsam](MP3_LIVE.md).
 
 ## Statik analizde kalan işler
-1.2 adayının Android lint raporunda hata yok; **50 uyarı ve 2 öneri** var. Bunlar ağırlıklı olarak bağımlılık sürümü önerileri, yerel sayı biçimlendirmesi, kullanılmayan kaynaklar ve KTX/Compose iyileştirmeleri. Bu nedenle “sıfır uyarı” veya tüm optimizasyonların tamamlandığı iddia edilmez.
+1.2 adayının Android lint raporunda hata yok; **52 uyarı ve 2 öneri (CI 118)** var. Bunlar ağırlıklı olarak bağımlılık sürümü önerileri, yerel sayı biçimlendirmesi, kullanılmayan kaynaklar ve KTX/Compose iyileştirmeleri. Bu nedenle “sıfır uyarı” veya tüm optimizasyonların tamamlandığı iddia edilmez.
 
 API 36 mevcut Play hedefini karşılar; lint'in en yeni Android sürümünü öneren `OldTargetApi` uyarısı ayrı konudur. YouTube alan adı projeye ait olmadığı için `AppLinkWarning` uyarısını gidermek amacıyla sahte alan doğrulaması eklenmedi. Bağlantı yapıştırma/paylaşma yolu korunuyor. Bağımlılıklar sürüm numarasını büyütmek amacıyla topluca yükseltilmedi; her güncelleme ayrıca derleme ve cihaz doğrulaması gerektirir.
+
+## Güncel MP3/canlı kayıt adayı — CI 118
+
+[CI 118](https://github.com/eekilinc/indirgitsin/actions/runs/33412840402) tüm testlerden geçti. İmzalı APK 4,89 MB; aynı Android 14 emülatöründe ortanca açılış 797 → 632 ms, boşta PSS 54.557 → 34.232 KiB. 54 uygulama birim testi, her Android 10/14/16 emülatöründe 10 test ve imzalı APK üzerinde 10 test başarılıdır. LAME dahil sekiz native dosyanın 16 KiB hizalaması uygundur. Bu ölçüm MP3/canlı kayıt yükü altındaki bellek veya pil tüketimini ölçmez. [Kanıt](measurements/candidate-118.json).
 
 ## MP3/canlı kayıt öncesi adayın ölçülmüş sonucu
 [CI 113](https://github.com/eekilinc/indirgitsin/actions/runs/33383131109) tüm doğrulamalardan geçti. APK 16,81 MB'dan **4,15 MB**'a indi; aynı Android 14 emülatöründe beş soğuk açılışın ortancası **801 → 609 ms**, tek boşta PSS örneği **54.617 → 33.449 KiB** oldu. İmzalı APK üzerinde altı test ve 1.1.1 üzerine kurulum başarılıdır. [Ayrıntılı kanıt ve sınırlar](VALIDATION.md).

@@ -3,6 +3,19 @@
 Bu değişikliğin ana kabul ölçütü: indirilen video dosyasında okunabilir ve çözülebilir bir görüntü izi
 ile ses izi bulunmalı; ses yoksa işlem başarılı gösterilmemeli.
 
+## MP3/canlı kayıt adayının sonucu — CI 118
+
+[CI 118](https://github.com/eekilinc/indirgitsin/actions/runs/33412840402), `acdffe46040c25f061e2af1501dcf29db8d8f67b` koduyla tüm kontrolleri geçti. [Makine tarafından okunabilir kanıt](measurements/candidate-118.json).
+
+- Uygulama: debug/release 54’er birim testi; cipher 62, Node 26 ve Python 5 testi. Release lint: 0 hata, 52 uyarı, 2 öneri.
+- Android 10/14/16: her birinde 10 cihaz testi. İmzalı APK: Android 14’te 10 test, sıfır atlama/hata; 1.1.1’den yükseltme başarılı.
+- MP3: mono/stereo AAC kaynakları üç bitrate’te gerçek MP3’e kodlandı ve tekrar çözüldü. TS/fMP4 kayıtları ses/görüntü, süre ve senkron açısından doğrulandı. Canlı kayıt testleri AOSP yazılım codec’lerini, normal birleştirme testi varsayılan cihaz codec’ini kullanır.
+- APK 4.888.129 bayt, AAB 9.543.303 bayt. Kaynak ZIP’i, cipher dahil 229 izlenen dosyayla aynı; LAME’in 49 özgün dosyasının SHA-256 değerleri ayrıca karşılaştırıldı.
+- Aynı emülatörde beşer açılış: eski ortanca 797 ms, aday 632 ms. Tek boşta PSS: 54.557 → 34.232 KiB. Eski 16.814.252 bayt APK’ya göre boyut %70,93 azaldı.
+- Kalıcı imza ve sekiz native dosyanın ELF/ZIP 16 KiB hizalaması doğrulandı. Gerçek 16 KiB ortam, fiziksel telefon, uzun MP3 dönüşümü, batarya ve gerçek YouTube canlı yayın kabulü yapılmadı.
+
+Önceki CI 113 ölçümleri aşağıda tarihsel karşılaştırma olarak korunur; yeni adayın değerleri yukarıdadır. [Telefon kabul adımları](MP3_LIVE.md).
+
 ## Bu çalışma ortamında çalıştırılan kontroller
 
 - Üretim Kotlin sınıflarını kullanan 30 regresyon kontrolü geçti.

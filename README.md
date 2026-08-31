@@ -50,13 +50,13 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 - Public GitHub güncelleme kontrolü; otomatik kontrolde altı saatlik aralık ve HTTP önbelleği.
 - TR/EN çevrimdışı gizlilik politikası.
 - Android 16 hedefi, optimize final APK/AAB ve daha geniş cihaz doğrulaması.
-- Gerçek MP3 dönüşümü: 128, 192 veya 320 kbps; kaynak ses korunarak ayrı MP3 oluşturulur.
+- Gerçek MP3 dönüşümü: 128, 192 veya 320 kbps; kaynak ses cihazda MP3’e kodlanır.
 - Şifresiz birleşik HLS canlı kayıt: 5/15/30/60 dakika, **Durdur ve kaydet**, kesintiden önceki bölümün kurtarılması.
 
 <p align="center">
   <img src="docs/assets/home-android14.png" alt="İndir Gitsin yeni ana sayfa — gerçek Android 14 emülatör görüntüsü" width="280">
 </p>
-<p align="center"><sub>1.2 geliştirme adayı · Android 14 emülatörü · gerçek uygulama görüntüsü</sub></p>
+<p align="center"><sub>1.2.0-dev.118 · Android 14 emülatörü · gerçek uygulama görüntüsü</sub></p>
 
 ## Kurulum
 
@@ -66,11 +66,15 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 
 Final paket kimliği `com.indirgitsin.app.stable` olarak sabittir. 1.1.1 ve sonraki final güncellemeleri aynı imzayı korur. **İndir Gitsin Test** ayrı uygulamadır; test uygulamasını kaldırmak zorunlu değildir.
 
-## Önceki adayın doğrulanan sonucu
+## Güncel test sürümü ve doğrulama
 
-MP3/canlı kayıt eklenmeden önceki [CI 113](https://github.com/eekilinc/indirgitsin/actions/runs/33383131109) birim/lint kontrolleri, Android 10/14/16 testleri ve imzalı APK üzerinde Android 14 testleriyle geçti. 1.1.1 üzerine güncelleme doğrulandı. APK **16,81 MB → 4,15 MB** oldu.
+**[MP3 + canlı kayıt APK’sını indir](https://github.com/eekilinc/indirgitsin/releases/download/candidate-1.2.0-118/indir-gitsin-1.2.0-dev.118.apk)** · [Sürüm, kaynak ZIP ve SHA-256](https://github.com/eekilinc/indirgitsin/releases/tag/candidate-1.2.0-118)
 
-Aynı emülatörde ortanca soğuk açılış **801 → 609 ms** ölçüldü; bu, gerçek telefon veya indirme hızı garantisi değildir. [Ölçümler, bellek ve test sınırları](docs/VALIDATION.md).
+Bu, **1.2.0-dev.118 imzalı test adayıdır**; GitHub’daki son final hâlâ 1.1.1’dir. Kalıcı imza ve paket kimliği korunur; 1.1.1’in üzerine kurulur. Uygulamayı kaldırmayın.
+
+[CI 118](https://github.com/eekilinc/indirgitsin/actions/runs/33412840402): 54 uygulama birim testi, 62 cipher testi, Node/Python kontrolleri ve lint; Android 10/14/16’da 10’ar cihaz testi; imzalı APK üzerinde 10 test ve 1.1.1’den güncelleme başarılıdır. Native kitaplıkların dört ABI’de ELF/ZIP 16 KiB hizalaması kontrol edildi.
+
+MP3 ve canlı kayıt dahil APK **16,81 MB → 4,89 MB**. Aynı Android 14 emülatöründe ortanca soğuk süreç açılışı **797 → 632 ms**, tek boşta PSS örneği **54.557 → 34.232 KiB**. Gerçek telefon/indirme hızı veya pil garantisi değildir. [Ham ölçümler](docs/measurements/candidate-118.json) · [Test kapsamı ve sınırlar](docs/VALIDATION.md).
 
 ## Neden hızlı?
 
