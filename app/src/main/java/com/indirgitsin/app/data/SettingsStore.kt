@@ -26,7 +26,7 @@ object SettingsStore {
     fun autoHighFlow(context: Context): Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AUTO_HIGH] ?: true }
     suspend fun setAutoHigh(context: Context, value: Boolean) { context.settingsDataStore.edit { it[KEY_AUTO_HIGH] = value } }
 
-    fun audioFormatFlow(context: Context): Flow<String> = context.settingsDataStore.data.map { it[KEY_AUDIO_FORMAT]?.takeIf { value -> value in setOf("M4A", "WEBM") } ?: "M4A" }
+    fun audioFormatFlow(context: Context): Flow<String> = context.settingsDataStore.data.map { it[KEY_AUDIO_FORMAT]?.takeIf { value -> value in setOf("M4A", "WEBM", "MP3") } ?: "M4A" }
     suspend fun setAudioFormat(context: Context, value: String) { context.settingsDataStore.edit { it[KEY_AUDIO_FORMAT] = value } }
 
     private fun cleanFolder(value: String): String = value.take(30).replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().trim('.').ifBlank { "IndirGitsin" }
