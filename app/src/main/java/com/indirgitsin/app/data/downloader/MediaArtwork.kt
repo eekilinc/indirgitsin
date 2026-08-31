@@ -61,7 +61,7 @@ object MediaArtwork {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth !in 1..16384 || bounds.outHeight !in 1..16384) return null
-        val options = BitmapFactory.Options()
+        val options = BitmapFactory.Options().apply { inSampleSize = 1 }
         while (maxOf(bounds.outWidth, bounds.outHeight) / options.inSampleSize > 1280) options.inSampleSize *= 2
         val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
         val scale = minOf(1f, 640f / maxOf(decoded.width, decoded.height))
