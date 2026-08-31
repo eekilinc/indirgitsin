@@ -1,6 +1,7 @@
 package com.indirgitsin.app
 
 import com.indirgitsin.app.data.downloader.ContentRange
+import com.indirgitsin.app.data.downloader.TransferProgress
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.StreamSelector
 import com.indirgitsin.app.util.VersionComparator
@@ -14,6 +15,33 @@ object CoreRegressionChecks {
         StreamOption("Video", ext, quality, "https://media.test/$quality/$ext", true, false, isVideoOnly = only, codec = codec)
 
     val cases: List<Pair<String, () -> Unit>> = listOf(
+        "throughput aggregates streams and estimates remaining transfer time" to {
+            val progress = TransferProgress(1_000)
+            val estimate = progress.update(2_000, 2_000_000, 10_000_000)
+            check(estimate.bytesPerSecond == 2_000_000L && estimate.remainingSeconds == 4L)
+        },
+        "unknown length has no invented remaining time" to {
+            check(TransferProgress(0).update(1_000, 5_000, -1).remainingSeconds == null)
+        },
+        "stalled transfers age out old throughput" to {
+            val progress = TransferProgress(0)
+            progress.update(1_000, 1_000, 10_000)
+            for (time in 2..7) progress.update(time * 1_000L, 1_000, 10_000)
+            val estimate = progress.update(8_000, 1_000, 10_000)
+            check(estimate.bytesPerSecond == 0L && estimate.remainingSeconds == null)
+        },
+        "counter reset or clock rollback cannot produce negative speed" to {
+            val progress = TransferProgress(0)
+            progress.update(1_000, 2_000, 10_000)
+            check(progress.update(2_000, 10, 10_000).bytesPerSecond == 0L)
+            check(progress.update(500, 20, 10_000).bytesPerSecond == 0L)
+        },
+        "completed transfer reports zero remaining time" to {
+            check(TransferProgress(0).update(1_000, 10_000, 10_000).remainingSeconds == 0L)
+        },
+        "initial sample is safe before any time has elapsed" to {
+            check(TransferProgress(100).update(100, 0, -1) == TransferProgress.Estimate(0, null))
+        },
         "360p video-only receives audio" to {
             val result = StreamSelector.prepare(listOf(video("360p"), audio()), 34).first { it.isVideo }
             check(result.needsMuxing && result.audioUrl == audio().url)

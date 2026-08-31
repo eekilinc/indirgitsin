@@ -20,3 +20,7 @@ Thumbs.db
 
 # Local validation tools
 .local-tools/
+
+# Permanent distribution identity: private key and password backup, never commit.
+.release-signing/
+*.p12

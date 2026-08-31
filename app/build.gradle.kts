@@ -19,6 +19,7 @@ val releaseSigningReady = listOf(releaseStore, releaseStorePassword, releaseAlia
 android {
     namespace = "com.indirgitsin.app"
     compileSdk = 35
+    testBuildType = System.getenv("ANDROID_TEST_BUILD_TYPE") ?: "debug"
 
     defaultConfig {
         applicationId = "com.indirgitsin.app"
@@ -42,6 +43,8 @@ android {
     }
     buildTypes {
         release {
+            // A permanent identity, separate from historical APKs signed with disposable debug keys.
+            applicationIdSuffix = ".stable"
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("distribution")
             isMinifyEnabled = false
             proguardFiles(
@@ -118,6 +121,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.work:work-testing:2.9.1")
 }
 
 val checkReleaseSigning by tasks.registering {

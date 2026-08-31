@@ -18,6 +18,10 @@ object SettingsStore {
     private val KEY_THEME = stringPreferencesKey("theme")
     private val KEY_APP_COLOR = stringPreferencesKey("app_color")
     private val KEY_LANGUAGE = stringPreferencesKey("app_language")
+    private val KEY_UNMETERED = booleanPreferencesKey("unmetered_only")
+
+    fun unmeteredFlow(context: Context): Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_UNMETERED] ?: false }
+    suspend fun setUnmetered(context: Context, value: Boolean) { context.settingsDataStore.edit { it[KEY_UNMETERED] = value } }
 
     fun autoHighFlow(context: Context): Flow<Boolean> = context.settingsDataStore.data.map { it[KEY_AUTO_HIGH] ?: true }
     suspend fun setAutoHigh(context: Context, value: Boolean) { context.settingsDataStore.edit { it[KEY_AUTO_HIGH] = value } }

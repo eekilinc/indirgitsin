@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.indirgitsin.app.data.lang.LocalAppLanguage
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.Alignment
@@ -63,13 +65,20 @@ data class ActiveDownload(
     val status: Int,
     val workId: UUID? = null,
     val stage: String? = null,
-    val percent: Int? = null
+    val percent: Int? = null,
+    val speed: Long = 0,
+    val eta: Long = -1
 )
 
 @Composable
 fun DownloadsScreen(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val language = LocalAppLanguage.current
+    var sortOrder by rememberSaveable { mutableIntStateOf(0) }
+    var sortMenu by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<DownloadedFile?>(null) }
+    var retrying by remember { mutableStateOf<Set<UUID>>(emptySet()) }
     val workManager = remember(context) { WorkManager.getInstance(context.applicationContext) }
     val jobs by remember(workManager) { workManager.getWorkInfosByTagFlow(FileDownloader.TAG) }.collectAsState(initial = emptyList())
     val downloadFolder by SettingsStore.downloadSubfolderFlow(context).collectAsState(initial = "IndirGitsin")
@@ -109,7 +118,11 @@ fun DownloadsScreen(navController: NavController) {
             job.progress.getString("name") ?: job.tags.firstOrNull { it.startsWith("title:") }?.removePrefix("title:") ?: "Video",
             job.progress.getLong("bytes", 0), job.progress.getLong("total", -1),
             if (job.state == WorkInfo.State.RUNNING) android.app.DownloadManager.STATUS_RUNNING else android.app.DownloadManager.STATUS_PENDING,
-            job.id, job.progress.getString("stage") ?: "Sırada", job.progress.getInt("percent", 0))
+            job.id, if (job.state == WorkInfo.State.ENQUEUED) {
+                if ("network:unmetered" in job.tags) tr(language, "waiting_unmetered") else tr(language, "waiting_network")
+            } else job.progress.getString("stage") ?: tr(language, "status_pending"), job.progress.getInt("percent", 0),
+            if (job.state == WorkInfo.State.RUNNING) job.progress.getLong("speed", 0) else 0,
+            if (job.state == WorkInfo.State.RUNNING) job.progress.getLong("eta", -1) else -1)
     }
     val allActive = active + workerActive
 
@@ -128,7 +141,7 @@ fun DownloadsScreen(navController: NavController) {
 
     val totalBytes = remember(files) { files.sumOf { it.sizeBytes } }
 
-    val filteredFiles = remember(files, searchQuery, selectedFilter) {
+    val filteredFiles = remember(files, searchQuery, selectedFilter, sortOrder) {
         files.filter { item ->
             val matchesQuery = searchQuery.isBlank() || item.name.contains(searchQuery.trim(), ignoreCase = true)
             val ext = item.name.substringAfterLast('.', "").lowercase()
@@ -140,7 +153,24 @@ fun DownloadsScreen(navController: NavController) {
                 else -> true
             }
             matchesQuery && matchesFilter
+        }.let { matches ->
+            when (sortOrder) {
+                1 -> matches.sortedBy { it.name.lowercase(Locale.ROOT) }
+                2 -> matches.sortedByDescending { it.sizeBytes }
+                else -> matches.sortedByDescending { it.dateMillis }
+            }
         }
+    }
+
+    deleteTarget?.let { item ->
+        AlertDialog(onDismissRequest = { deleteTarget = null },
+            title = { Text(t("delete_confirm_title")) },
+            text = { Text(t("delete_confirm_body", item.name)) },
+            confirmButton = { TextButton(onClick = {
+                deleteTarget = null
+                scope.launch { deleteFile(context, item); refresh() }
+            }) { Text(t("delete")) } },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text(t("cancel")) } })
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -153,6 +183,15 @@ fun DownloadsScreen(navController: NavController) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            Box {
+                IconButton(onClick = { sortMenu = true }) { Icon(Icons.Rounded.Sort, contentDescription = t("sort")) }
+                DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                    listOf("sort_newest", "sort_name", "sort_size").forEachIndexed { index, key ->
+                        DropdownMenuItem(text = { Text(t(key)) }, onClick = { sortOrder = index; sortMenu = false },
+                            trailingIcon = { if (sortOrder == index) Icon(Icons.Rounded.Check, null) })
+                    }
+                }
             }
             IconButton(onClick = { refresh() }) { Icon(Icons.Rounded.Refresh, contentDescription = refreshText) }
             if (files.isNotEmpty()) {
@@ -239,8 +278,24 @@ fun DownloadsScreen(navController: NavController) {
         }
 
         jobs.filter { it.state == WorkInfo.State.FAILED }.takeLast(3).forEach { job ->
-            Text("${job.outputData.getString("name") ?: "Video"}: ${job.outputData.getString("error") ?: "İndirme başarısız"}",
-                color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${job.outputData.getString("name") ?: "Video"}: ${job.outputData.getString("error") ?: "İndirme başarısız"}",
+                    modifier = Modifier.weight(1f), maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                if (!job.outputData.getString("videoId").isNullOrBlank()) {
+                    TextButton(enabled = job.id !in retrying, onClick = {
+                        retrying = retrying + job.id
+                        scope.launch {
+                            try {
+                                val added = FileDownloader.retry(context, job)
+                                Toast.makeText(context, tr(language, if (added) "retry_queued" else "already_queued"), Toast.LENGTH_SHORT).show()
+                            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                            catch (e: Exception) { Toast.makeText(context, e.message, Toast.LENGTH_LONG).show() }
+                            finally { retrying = retrying - job.id }
+                        }
+                    }) { Text(t("retry")) }
+                }
+            }
         }
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -263,7 +318,7 @@ fun DownloadsScreen(navController: NavController) {
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
-                items(filteredFiles, key = { it.name + it.dateMillis }) { item ->
+                items(filteredFiles, key = { it.uri.toString() }) { item ->
                     DownloadCard(
                         item = item,
                         onPlay = {
@@ -271,12 +326,7 @@ fun DownloadsScreen(navController: NavController) {
                         },
                         onOpenExternal = { playFile(context, item) },
                         onShare = { shareFile(context, item) },
-                        onDelete = {
-                            scope.launch {
-                                deleteFile(context, item)
-                                refresh()
-                            }
-                        }
+                        onDelete = { deleteTarget = item }
                     )
                 }
             }
@@ -498,7 +548,12 @@ private fun ActiveDownloadCard(item: ActiveDownload, onCancel: () -> Unit) {
                 Text("${(progress*100).toInt()}%", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
                 IconButton(onClick = onCancel) { Icon(Icons.Rounded.Close, contentDescription = t("cancel"), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
             }
-            LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)))
+            if (item.speed > 0) {
+                val remaining = if (item.eta >= 0) t("remaining_estimate", formatRemaining(item.eta)) else ""
+                Text("${formatSize(item.speed)}/s  $remaining", style = MaterialTheme.typography.labelSmall)
+            }
+            if (progress > 0) LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+            else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -565,3 +620,8 @@ private fun formatSize(bytes: Long): String = when {
 private fun formatDate(millis: Long): String = try {
     SimpleDateFormat("dd MMM yyyy HH:mm", Locale("tr", "TR")).format(Date(millis))
 } catch (_: Exception) { "" }
+
+private fun formatRemaining(seconds: Long): String = when {
+    seconds >= 3600 -> "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)
+    else -> "%d:%02d".format(seconds / 60, seconds % 60)
+}

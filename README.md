@@ -18,6 +18,16 @@ Ses akışları gerçek M4A/WebM formatlarıyla sunulur. Uygulama MP3 dönüşt�
 M4A/WebM dosyalarını MP3 olarak yeniden adlandırmaz. HLS/canlı yayın kaydı desteklenmez.
 Desteklenen kalite, videonun sunduğu akışlara ve cihazın codec desteğine bağlıdır.
 
+## 1.1.0 final yenilikleri
+
+- Son beş saniyenin toplam video/ses aktarım hızı ve tahmini kalan aktarım süresi.
+- Aktif aynı video/kalite/format için yinelenen istek engeli; başarısız işten yeniden deneme.
+- Ayarlardan yalnızca tarifesiz ağ (WorkManager UNMETERED). Varsayılan kapalıdır;
+  değişiklik yeni kuyruğa alınan işlere uygulanır. Yeniden deneme güncel ağ/klasör tercihlerini kullanır.
+- Dosyalarda en yeni/ad/boyut sıralaması, dosya ve geçmiş silmede onay.
+- Özel GitHub deposuna erişilemediğinde yanlış “güncel” sonucu yerine açıklama ve tarayıcı bağlantısı.
+- Uygulama içi bileşen lisans metinleri. Desteklenmeyen arka planda oynatma iddiası kaldırıldı.
+
 ## Kuyruk ve indirme ekranı
 
 İndirmeler WorkManager ile kalıcı olarak kuyruğa alınır. Aynı anda en fazla iki indirme işi,
@@ -33,7 +43,7 @@ medya listesine çıkarılmaz. Android 7–9 için depolama izni gerekir. Yeni d
 önceki indirmelerin üzerine yazmamak için iş kimliği içeren benzersiz ad alır.
 Eski DownloadManager indirmeleri ekranda takip edilmeye devam edilir.
 
-Çalma listelerinin devam sayfaları okunur; seçili videolar tek seferde kalıcı kuyruğa eklenir.
+Çalma listelerinin devam sayfaları okunur; seçili videolar kalıcı kuyruğa eklenir; zaten aktif olan aynı toplu seçim atlanır.
 Sonsuz radyo/çok büyük listeler için 100 sayfa sınırı vardır.
 Varsayılan kalite, toplu indirmelerde seçimi ve tek video ekranında sıralamayı etkiler.
 Varsayılan ses formatı ses seçeneklerinin sırasını belirler.
@@ -81,7 +91,7 @@ Kalıcı dağıtım için imzalı GitHub Release, v*.*.* etiketi gönderildiğin
 
 GitHub Actions secrets:
 
-- ANDROID_KEYSTORE_BASE64: mevcut dağıtım keystore dosyasının Base64 içeriği
+- ANDROID_KEYSTORE_BASE64: kalıcı dağıtım keystore dosyasının Base64 içeriği
 - ANDROID_KEYSTORE_PASSWORD
 - ANDROID_KEY_ALIAS
 - ANDROID_KEY_PASSWORD
@@ -90,9 +100,22 @@ Yerel release derlemesinde aynı bilgiler RELEASE_STORE_FILE, RELEASE_STORE_PASS
 RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD ortam değişkenleriyle verilir.
 Eksik imzayla release APK üretilmesi engellenir. Anahtar/password dosyalarını Git'e eklemeyin.
 
-Mevcut kullanıcıların üzerine güncelleme kurabilmesi için önceki dağıtımın imza anahtarı korunmalıdır.
-Bu değişiklik yeni imza anahtarı üretmez ve GitHub secrets ayarlamaz.
-Daha önce farklı debug anahtarlarıyla dağıtılmış APK'ların güncelleme sorunu otomatik giderilemez.
+Final paket kimliği `com.indirgitsin.app.stable` olarak sabittir. Yeni kalıcı RSA dağıtım anahtarı kullanılır;
+public sertifika parmak izi `docs/release-certificate.sha256` ile CI'da doğrulanır.
+Bu kimlik eski `com.indirgitsin.app` ve `.preview` uygulamalarının yanına kurulur;
+ayarlar/geçmiş ayrı başlar, eski uygulamalar veya dosyalar silinmez.
+Android depolama izinleri nedeniyle eski uygulamanın dosyalarının tamamı yeni uygulamada görünmeyebilir.
+Sonraki final güncellemelerinde **aynı paket kimliği ve aynı anahtar korunmalıdır**.
+Yerel özel anahtar/parola yedeği Git'in dışındaki `.release-signing/` klasöründedir;
+bu klasörü güvenli, şifreli bir konuma yedekleyin. Dosyaları commit/release varlığı yapmayın.
+
+Final işinde release birim testleri/lint, Android 14 üzerinde **imzalı release APK** cihaz testleri,
+sertifika karşılaştırması ve SHA-256 üretimi de yapılır. GitHub Release'e APK, özet dosyası ve
+sabitlenmiş cipher kaynaklarını da içeren kaynak kod ZIP'i eklenir.
+İmza kurulumu: https://docs.github.com/en/rest/guides/encrypting-secrets-for-the-rest-api
+
+GitHub deposu özel kalır. APK içine erişim token'ı eklenmez. Güncellemeleri kontrol etmek veya
+indirmek için GitHub'a giriş yapılmış tarayıcı gerekebilir.
 
 ## Gizlilik ve sınırlamalar
 
@@ -108,4 +131,6 @@ Yalnızca indirme hakkınız olan içerikleri kullanın.
 
 Kök depoda bir LICENSE dosyası bulunmuyor; önceki README'deki MIT ifadesi bu nedenle kaldırıldı.
 cipher/ alt modülü GPL-3.0 lisansını içeriyor; NewPipeExtractor da kendi lisans koşullarına tabidir.
-Bu güncelleme projeyi yeniden lisanslamaz. Dağıtım öncesinde proje lisansı ve üçüncü taraf bildirimleri tamamlanmalıdır.
+Bu güncelleme projeyi yeniden lisanslamaz. Ana bağımlılık bildirimleri ve GPL v3/Apache 2.0 metinleri
+`app/src/main/assets/THIRD_PARTY_NOTICES.txt` içinde, uygulamanın ayarlar ekranından çevrimdışı okunabilir.
+Kaynak kod arşivi özel GitHub yayınına eklenir. Herkese açık dağıtımdan önce proje lisansı ayrıca kararlaştırılmalıdır.

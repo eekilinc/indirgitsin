@@ -19,6 +19,7 @@ $sourcePaths = @(
     'app/src/main/java/com/indirgitsin/app/data/model/Models.kt',
     'app/src/main/java/com/indirgitsin/app/data/model/StreamSelector.kt',
     'app/src/main/java/com/indirgitsin/app/data/downloader/ContentRange.kt',
+    'app/src/main/java/com/indirgitsin/app/data/downloader/TransferProgress.kt',
     'app/src/main/java/com/indirgitsin/app/util/VersionComparator.kt',
     'app/src/main/java/com/indirgitsin/app/util/YoutubeLinkHelper.kt',
     'app/src/test/java/com/indirgitsin/app/CoreRegressionChecks.kt'

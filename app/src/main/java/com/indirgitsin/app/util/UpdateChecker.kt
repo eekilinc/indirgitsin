@@ -19,8 +19,16 @@ object UpdateChecker {
         .build()
 
     data class UpdateInfo(val latestTag: String, val htmlUrl: String, val body: String)
+    sealed interface CheckResult {
+        data class Available(val info: UpdateInfo) : CheckResult
+        data object Current : CheckResult
+        data object Unavailable : CheckResult
+    }
+    const val RELEASES_PAGE = "https://github.com/eekilinc/indirgitsin/releases/latest"
 
-    suspend fun check(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun check(context: Context): UpdateInfo? = (checkDetailed(context) as? CheckResult.Available)?.info
+
+    suspend fun checkDetailed(context: Context): CheckResult = withContext(Dispatchers.IO) {
         try {
             val current = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0" } catch (_: Exception) { "0" }
             val req = Request.Builder()
@@ -33,15 +41,16 @@ object UpdateChecker {
             val tag = json.optString("tag_name", "")
             val htmlUrl = json.optString("html_url", "https://github.com/eekilinc/indirgitsin/releases/latest")
             val notes = json.optString("body", "")
-            if (tag.isBlank()) return@withContext null
-            if (VersionComparator.isNewer(tag, current)) UpdateInfo(tag, htmlUrl, notes) else null
+            if (tag.isBlank()) return@withContext CheckResult.Unavailable
+            if (VersionComparator.isNewer(tag, current)) CheckResult.Available(UpdateInfo(tag, htmlUrl, notes)) else CheckResult.Current
         } catch (e: CancellationException) { throw e }
-        catch (_: Exception) { null }
+        catch (_: Exception) { CheckResult.Unavailable }
     }
 
     fun openUpdatePage(context: Context, info: UpdateInfo) {
         try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.htmlUrl))
+            val trustedUrl = info.htmlUrl.takeIf { it.startsWith("https://github.com/eekilinc/indirgitsin/releases/") } ?: RELEASES_PAGE
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(trustedUrl))
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
         } catch (_: Exception) {}

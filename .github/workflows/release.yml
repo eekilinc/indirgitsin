@@ -134,8 +134,15 @@ jobs:
     needs: [validate, device-test]
     if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-preview')
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     permissions:
       contents: write
+    env:
+      RELEASE_STORE_FILE: ${{ runner.temp }}/distribution.p12
+      RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_TEST_BUILD_TYPE: release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -146,27 +153,88 @@ jobs:
           java-version: '17'
           cache: gradle
       - uses: android-actions/setup-android@v3
-      - name: Prepare existing distribution signing key
+      - name: Prepare permanent distribution signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::ANDROID_KEYSTORE_BASE64 must contain the existing distribution key."
+            echo "::error::Permanent distribution signing key is required."
             exit 1
           fi
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/distribution.jks"
-      - name: Build signed release
-        env:
-          RELEASE_STORE_FILE: ${{ runner.temp }}/distribution.jks
-          RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RELEASE_STORE_FILE"
+      - name: Build and check signed release
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleRelease --stacktrace
-      - name: Publish signed APK
+          ./gradlew :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --stacktrace
+      - name: Reserve disk space and enable KVM
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test the signed release on Android 14
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          disk-size: 2048M
+          emulator-boot-timeout: 300
+          disable-animations: true
+          script: |
+            ./gradlew :app:connectedReleaseAndroidTest --stacktrace
+            adb shell am start -W -n com.indirgitsin.app.stable/com.indirgitsin.app.MainActivity
+            adb exec-out screencap -p > app/build/reports/release-home.png
+      - name: Verify permanent certificate and prepare release assets
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk > certificate.txt
+          cat certificate.txt
+          ACTUAL=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certificate.txt)
+          EXPECTED=$(tr -d '\r\n' < docs/release-certificate.sha256)
+          test "$ACTUAL" = "$EXPECTED"
+          cp app/build/outputs/apk/release/app-release.apk "indir-gitsin-${GITHUB_REF_NAME#v}.apk"
+          python3 tools/package-source.py "indir-gitsin-${GITHUB_REF_NAME#v}-source.zip"
+          sha256sum indir-gitsin-*.apk indir-gitsin-*-source.zip > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signed-release-validation
+          path: |
+            app/build/reports/
+            app/build/outputs/apk/release/*.apk
+            certificate.txt
+      - name: Publish signed final APK
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/app-release.apk
+          name: İndir Gitsin ${{ github.ref_name }} — Final
+          prerelease: false
+          make_latest: true
           fail_on_unmatched_files: true
-          generate_release_notes: true
+          body: |
+            ## Final sürüm
+            - Video ve ses paralel indirilir, yeniden kodlamadan tek dosyada birleştirilir.
+            - İndirme hızı ve tahmini kalan süre gösterilir.
+            - Başarısız işler yeniden denenebilir; aynı video ve kalite aktifken tekrar kuyruğa eklenmez.
+            - İsteğe bağlı yalnızca tarifesiz ağ ayarı (yeni indirmeler için).
+            - Dosyaları tarih/ad/boyuta göre sıralama; dosya ve geçmiş silmeden önce onay.
+            - Güncelleme erişim hataları artık yanlışlıkla “güncel” gösterilmez.
+
+            **Kurulum:** APK kalıcı anahtarla imzalanmıştır. `com.indirgitsin.app.stable` kimliğiyle eski/test uygulamalarının yanına kurulur; onları kaldırmanız gerekmez. Ayarlar ve geçmiş ayrı başlar. Sonraki final sürümleri aynı anahtarla bunun üzerine güncellenebilir.
+            Önceki uygulamanın dosyaları telefonda korunur; Android izinleri nedeniyle final uygulamasında hepsi otomatik görünmeyebilir.
+
+            **Doğrulama:** Birim testleri ve lint; Android 10/14 üzerinde ses–görüntü birleştirme/çözme, kuyruk/yeniden deneme ve açılış testleri; imzalı final APK üzerinde Android 14 cihaz testleri; imza sertifikası doğrulaması.
+            Önceki test sürümünün gerçek telefonda sesli video indirdiği kullanıcı tarafından doğrulandı. Yeni sürümün gerçek YouTube testi cihazda ayrıca yapılmalıdır.
+
+            APK, SHA256SUMS.txt ve cipher alt modülünü içeren kaynak kod arşivi aşağıdadır. Depo özel olduğu için GitHub hesabınızla giriş yapmanız gerekir.
+            MP3 dönüştürme, canlı yayın kaydı ve bayt düzeyinde kaldığı yerden devam henüz desteklenmez.
+
+            Commit: ${{ github.sha }}
+            Build: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          files: |
+            indir-gitsin-*.apk
+            indir-gitsin-*-source.zip
+            SHA256SUMS.txt
+      - name: Remove runner signing material
+        if: always()
+        run: rm -f "$RELEASE_STORE_FILE"

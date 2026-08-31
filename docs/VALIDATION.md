@@ -5,7 +5,7 @@ ile ses izi bulunmalı; ses yoksa işlem başarılı gösterilmemeli.
 
 ## Bu çalışma ortamında çalıştırılan kontroller
 
-- Üretim Kotlin sınıflarını kullanan 24 regresyon kontrolü geçti.
+- Üretim Kotlin sınıflarını kullanan 30 regresyon kontrolü geçti.
 - cipher/tools/tools.test.mjs içindeki 26 test geçti.
 - Kotlin PSI ile 38 Kotlin dosyasının sözdizimi kontrol edildi.
 - Gradle 8.13, help --offline göreviyle değiştirilmiş yapılandırmayı başarıyla yükledi.
@@ -16,6 +16,12 @@ ile ses izi bulunmalı; ses yoksa işlem başarılı gösterilmemeli.
 
 Kotlin sözdizimi kontrolü, Android API tip kontrolünün veya gerçek APK derlemesinin yerine geçmez.
 Bu makinedeki önbellek ile SDK gerektirmeyen kontroller tools/check-core.ps1 üzerinden tekrar çalıştırılabilir.
+
+## Önceki sürümün gerçek cihaz sonucu
+
+Kullanıcı 1.0.94-preview sürümünde sesli video indirmenin telefonda çalıştığını ve hızlı olduğunu
+31 Ağustos 2026'da doğruladı. Bu bildirim tüm kalite/cihaz/ağ senaryolarının test edildiği anlamına gelmez.
+1.1.0 finalde birleştirme/aktarım motoru korunur; kuyruk ve arayüz değişiklikleri ayrıca test edilir.
 
 ## SDK olan ortamda
 
@@ -30,6 +36,11 @@ MediaFileMuxerInstrumentedTest:
 - Her iki izin örnek zaman damgalarını kaynak dosyalarla karşılaştırır.
 - Sonuçtaki hem görüntünün hem sesin MediaCodec ile çözülebildiğini kontrol eder.
 - Ses içermeyen bir video dosyasının başarı doğrulamasından geçmediğini kontrol eder.
+
+DownloadQueueInstrumentedTest gerçek WorkManager kuyruğunda yinelenen isteği, tarifesiz ağ kısıtını,
+kontrollü hatadan yeniden denemeyi, güncel ağ ayarını ve iptal sonrası yeniden eklemeyi doğrular.
+Aktarım kontrollü bir test worker'ıyla hata verir; dış YouTube ağına bağımlı değildir.
+StartupInstrumentedTest ana ekranın açılıp RESUMED durumuna geldiğini doğrular.
 
 CI yapılandırması bu cihaz testlerini API 29 ve 34 emülatörlerinde çalıştırır ve release işini sonuçlarına bağlar.
 Yayınlanan ön sürümün açıklamasındaki Build bağlantısı, o APK'ya ait test sonuçlarını gösterir.
@@ -49,21 +60,26 @@ Yayınlanan ön sürümün açıklamasındaki Build bağlantısı, o APK'ya ait 
 | İndirme sırasında uygulamadan çıkma | Foreground worker işini sürdürebilir |
 | Süreç ölümü / yeniden açma | Kalıcı iş tekrar çalışır; gerekirse aktarım baştan başlar |
 | Birleştirme sırasında iptal | Yarım sonuç tamamlandı diye listelenmez |
-| Aynı video iki kere indirme | Mevcut dosya silinmez; farklı iş adı kullanılır |
+| Aynı video/kaliteye aktifken tekrar basma | İkinci iş oluşturulmaz; tamamlandıktan sonra yeni indirmeye izin verilir |
 | Önbelleği temizleme | Aktif indirme parçaları silinmez |
 | Android 7–9 depolama izni reddi | Kullanıcıya izin gereksinimi bildirilir |
 | Uzun playlist | Devam sayfaları okunur ve seçilenlerin tümü kuyruğa alınır |
 | A bağlantısından hemen sonra B | A'nın geç gelen sonucu B'yi ezmez |
 | v1.0.5 / 1.0.5 | Güncelleme uyarısı çıkmaz |
-| Sil / uygulama içi oynat / paylaş | Doğru URI; silinen dosya yeniden listelenmez |
+| Sil / uygulama içi oynat / paylaş | Doğru URI; silmek için onay gerekir; iptal dosyayı korur |
+| Hız / tahmini kalan | İki aktarımın toplamını gösterir; bilinmeyen boyutta süre uydurulmaz |
+| Tarifesiz ağ açık, mobil veri tarifeli | İş bekler; uygun ağ gelince başlar |
+| Başarısız indirmede yeniden dene | Güncel bağlantı çözülür, baştan kuyruğa alınır |
+| Dosya sıralama | En yeni, ad, boyut sıraları arama/filtre ile birlikte çalışır |
+| Özel GitHub veya bağlantı hatası | Güncel iddiası yerine erişim açıklaması ve GitHub bağlantısı |
 
-## Yayın engelleri
+## Final yayın kapıları
 
-Kalıcı release için mevcut dağıtım keystore'u ve GitHub secrets gerekiyor; yeni dağıtım anahtarı üretilmedi.
-Main/master push'u tüm kontroller geçince debug anahtarıyla imzalanmış test APK'sını GitHub ön sürümü olarak yayımlar.
-Test uygulaması `.preview` paket kimliğiyle mevcut uygulamanın yanına kurulur; önceki uygulamayı kaldırmak gerekmez.
-CI debug anahtarı kalıcı olmadığı için sonraki ön sürümde yalnızca test uygulamasını yeniden kurmak gerekebilir.
-Kalıcı yayın etiket push'u ile tetiklenir. İmza veya doğrulama eksikse kalıcı yayın durur.
+Kalıcı anahtar GitHub Actions secrets üzerinden sağlanır; paket kimliği `.stable` olur.
+Eksik imza, hatalı sertifika veya başarısız doğrulama final yayınını durdurur.
+Debug cihaz testleri API 29/34 üzerinde; ek imzalı release cihaz testi API 34 üzerinde çalışır.
+APK ve kaynak ZIP için SHA256SUMS.txt yayımlanır. Kaynak arşivi yalnızca Git'in izlediği dosyalardan,
+cipher alt modülünün sabitlenmiş sürümü dahil edilerek üretilir; yerel özel anahtar dahil edilmez.
 
 ## Bilinen sınırlar
 

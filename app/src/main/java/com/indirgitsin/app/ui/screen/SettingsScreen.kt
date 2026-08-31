@@ -28,6 +28,9 @@ import com.indirgitsin.app.data.history.AppDatabase
 import com.indirgitsin.app.data.lang.t
 import com.indirgitsin.app.data.lang.tr
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.indirgitsin.app.util.UpdateChecker
 import java.io.File
 
 private fun calcCacheSizeBytes(context: Context): Long {
@@ -48,6 +51,11 @@ private fun formatByteSize(bytes: Long): String = when {
 fun SettingsScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val unmetered by SettingsStore.unmeteredFlow(context).collectAsState(initial = false)
+    var updateUnavailable by remember { mutableStateOf(false) }
+    var confirmHistoryClear by remember { mutableStateOf(false) }
+    var showNotices by remember { mutableStateOf(false) }
+    var notices by remember { mutableStateOf("") }
     val autoHigh by SettingsStore.autoHighFlow(context).collectAsState(initial = true)
     val audioFormat by SettingsStore.audioFormatFlow(context).collectAsState(initial = "M4A")
     val downloadFolder by SettingsStore.downloadSubfolderFlow(context).collectAsState(initial = "IndirGitsin")
@@ -59,7 +67,37 @@ fun SettingsScreen() {
     val theme by SettingsStore.themeFlow(context).collectAsState(initial = "dark")
     val appColor by SettingsStore.appColorFlow(context).collectAsState(initial = "red")
     val language by SettingsStore.languageFlow(context).collectAsState(initial = "tr")
-    var cacheSizeBytes by remember { mutableLongStateOf(calcCacheSizeBytes(context)) }
+    var cacheSizeBytes by remember { mutableLongStateOf(0) }
+    LaunchedEffect(Unit) { cacheSizeBytes = withContext(Dispatchers.IO) { calcCacheSizeBytes(context) } }
+    LaunchedEffect(showNotices) {
+        if (showNotices) notices = withContext(Dispatchers.IO) {
+            context.assets.open("THIRD_PARTY_NOTICES.txt").bufferedReader().use { it.readText() }
+        }
+    }
+    if (showNotices) AlertDialog(onDismissRequest = { showNotices = false },
+        title = { Text(t("license")) },
+        text = { Text(notices, Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) },
+        confirmButton = { TextButton(onClick = { showNotices = false }) { Text(t("close")) } })
+    if (updateUnavailable) AlertDialog(onDismissRequest = { updateUnavailable = false },
+        title = { Text(t("update_unavailable_title")) }, text = { Text(t("update_unavailable_body")) },
+        confirmButton = { TextButton(onClick = {
+            UpdateChecker.openUpdatePage(context, UpdateChecker.UpdateInfo("", UpdateChecker.RELEASES_PAGE, ""))
+            updateUnavailable = false
+        }) { Text(t("open_github")) } },
+        dismissButton = { TextButton(onClick = { updateUnavailable = false }) { Text(t("cancel")) } })
+    if (confirmHistoryClear) AlertDialog(onDismissRequest = { confirmHistoryClear = false },
+        title = { Text(t("clear_history")) }, text = { Text(t("history_clear_confirm")) },
+        confirmButton = { TextButton(onClick = {
+            confirmHistoryClear = false
+            scope.launch {
+                try {
+                    AppDatabase.get(context).historyDao().clearAll()
+                    Toast.makeText(context, tr(language, "history_cleared"), Toast.LENGTH_SHORT).show()
+                } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (_: Exception) { Toast.makeText(context, tr(language, "privacy_stays"), Toast.LENGTH_SHORT).show() }
+            }
+        }) { Text(t("clear")) } },
+        dismissButton = { TextButton(onClick = { confirmHistoryClear = false }) { Text(t("cancel")) } })
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(t("settings"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
@@ -197,6 +235,11 @@ fun SettingsScreen() {
             )
         }
 
+        PremiumSettingCard(icon = Icons.Rounded.Wifi, title = t("unmetered_title"), subtitle = t("unmetered_sub"),
+            action = { Switch(checked = unmetered, onCheckedChange = { enabled ->
+                scope.launch { SettingsStore.setUnmetered(context, enabled) }
+            }) })
+
         // Varsayılan Kalite
         PremiumSettingCard(
             icon = Icons.Rounded.HighQuality,
@@ -239,10 +282,12 @@ fun SettingsScreen() {
                     scope.launch {
                         try {
                             val oldSize = formatByteSize(cacheSizeBytes)
-                            context.cacheDir.listFiles()?.forEach { f ->
-                                try { f.deleteRecursively() } catch (_: Exception) {}
+                            cacheSizeBytes = withContext(Dispatchers.IO) {
+                                context.cacheDir.listFiles()?.forEach { f ->
+                                    try { f.deleteRecursively() } catch (_: Exception) {}
+                                }
+                                calcCacheSizeBytes(context)
                             }
-                            cacheSizeBytes = calcCacheSizeBytes(context)
                             Toast.makeText(context, tr(language, "cache_cleared", oldSize), Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
                             Toast.makeText(context, e.message ?: "Hata", Toast.LENGTH_SHORT).show()
@@ -258,17 +303,9 @@ fun SettingsScreen() {
             title = t("privacy"),
             subtitle = t("privacy_sub"),
             action = {
-                TextButton(onClick = {
-                    scope.launch {
-                        try {
-                            val db = AppDatabase.get(context)
-                            db.historyDao().clearAll()
-                            Toast.makeText(context, tr(language, "history_cleared"), Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            Toast.makeText(context, tr(language, "privacy_stays"), Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }) { Text(tr(language, "clear"), fontWeight = FontWeight.Bold) }
+                TextButton(onClick = { confirmHistoryClear = true }) {
+                    Text(tr(language, "clear"), fontWeight = FontWeight.Bold)
+                }
             }
         )
 
@@ -282,9 +319,13 @@ fun SettingsScreen() {
                 else TextButton(onClick = {
                     checking = true
                     scope.launch {
-                        val info = com.indirgitsin.app.util.UpdateChecker.check(context)
-                        checking = false
-                        if (info != null) manualUpdate = info else Toast.makeText(context, tr(language, "latest_version", version), Toast.LENGTH_SHORT).show()
+                        try {
+                            when (val result = UpdateChecker.checkDetailed(context)) {
+                                is UpdateChecker.CheckResult.Available -> manualUpdate = result.info
+                                UpdateChecker.CheckResult.Current -> Toast.makeText(context, tr(language, "latest_version", version), Toast.LENGTH_SHORT).show()
+                                UpdateChecker.CheckResult.Unavailable -> updateUnavailable = true
+                            }
+                        } finally { checking = false }
                     }
                 }) { Text(tr(language, "check"), fontWeight = FontWeight.Bold) }
             }
@@ -332,14 +373,7 @@ fun SettingsScreen() {
             title = t("license"),
             subtitle = t("license_sub"),
             action = {
-                TextButton(onClick = {
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eekilinc/indirgitsin/blob/main/LICENSE"))
-                        context.startActivity(intent)
-                    } catch (_: Exception) {
-                        Toast.makeText(context, tr(language, "mit"), Toast.LENGTH_SHORT).show()
-                    }
-                }) { Text(tr(language, "see"), fontWeight = FontWeight.Bold) }
+                TextButton(onClick = { showNotices = true }) { Text(tr(language, "see"), fontWeight = FontWeight.Bold) }
             }
         )
 

@@ -18,6 +18,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import androidx.work.Data
 import com.indirgitsin.app.MainActivity
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.extractor.YoutubeExtractor
@@ -28,6 +29,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -49,6 +52,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
         setProgress(workDataOf("name" to title, "stage" to "Sırada"))
         try {
             slots.withPermit {
+                setProgress(workDataOf("name" to title, "stage" to "Bağlantı çözümleniyor…"))
                 setForeground(foreground("Bağlantı çözümleniyor…", 0))
                 performDownload()
             }
@@ -65,14 +69,14 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 Result.retry()
             } else {
                 showResult("İndirme başarısız", reason)
-                Result.failure(workDataOf("name" to title, "error" to reason))
+                Result.failure(Data.Builder().putAll(inputData).putString("name", title).putString("error", reason).build())
             }
         }
     }
 
     private suspend fun performDownload(): Result {
         val videoId = requireNotNull(inputData.getString("videoId"))
-        val info = YoutubeExtractor.extract("https://www.youtube.com/watch?v=$videoId", applicationContext, forceRefresh = runAttemptCount > 0).getOrThrow()
+        val info = YoutubeExtractor.extract("https://www.youtube.com/watch?v=$videoId", applicationContext, forceRefresh = runAttemptCount > 0 || inputData.getBoolean("manualRetry", false)).getOrThrow()
         val candidates = info.streams.filter {
             it.isDownloadable && it.extension == inputData.getString("extension") &&
                 it.quality == inputData.getString("quality") && it.isAudioOnly == inputData.getBoolean("audioOnly", false)
@@ -96,6 +100,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
         val primaryTotal = AtomicLong(-1)
         val audioTotal = AtomicLong(if (option.needsMuxing) -1 else 0)
         val lastUpdate = AtomicLong()
+        val estimator = TransferProgress(SystemClock.elapsedRealtime())
         fun progress() {
             val now = SystemClock.elapsedRealtime()
             val previous = lastUpdate.get()
@@ -103,11 +108,16 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
             val downloaded = primaryBytes.get() + audioBytes.get()
             val total = if (primaryTotal.get() < 0 || audioTotal.get() < 0) -1 else primaryTotal.get() + audioTotal.get()
             val percent = if (total > 0) (downloaded * 95 / total).toInt().coerceIn(0, 95) else 0
-            setProgressAsync(workDataOf("name" to name, "stage" to "İndiriliyor", "bytes" to downloaded, "total" to total, "percent" to percent))
-            notifySafely(notificationId, notification("İndiriliyor", percent))
+            val estimate = estimator.update(now, downloaded, total)
+            setProgressAsync(workDataOf("name" to name, "stage" to "İndiriliyor", "bytes" to downloaded,
+                "total" to total, "percent" to percent, "speed" to estimate.bytesPerSecond, "eta" to (estimate.remainingSeconds ?: -1)))
+            val speed = android.text.format.Formatter.formatShortFileSize(applicationContext, estimate.bytesPerSecond)
+            notifySafely(notificationId, notification("İndiriliyor • $speed/sn", percent))
         }
         try {
             coroutineScope {
+                val ticker = launch { while (true) { delay(1_000); progress() } }
+                try {
                 val videoJob = async {
                     MediaTransfer.download(option.url, primary) { done, total -> primaryBytes.set(done); primaryTotal.set(total); progress() }
                 }
@@ -116,6 +126,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 } else null
                 videoJob.await()
                 audioJob?.await()
+                } finally { ticker.cancel() }
             }
             currentCoroutineContext().ensureActive()
             val resultFile = if (option.needsMuxing) {
@@ -127,7 +138,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
             MediaFileMuxer.validate(resultFile, option.isVideo, info.durationSeconds)
             currentCoroutineContext().ensureActive()
             setProgress(workDataOf("name" to name, "stage" to "Dosya kaydediliyor", "percent" to 99))
-            val folder = SettingsStore.getDownloadSubfolderNow(applicationContext)
+            val folder = inputData.getString("folder") ?: SettingsStore.getDownloadSubfolderNow(applicationContext)
             val mime = DownloadStorage.mime(extension, option.isAudioOnly)
             val uri = DownloadStorage.publish(applicationContext, resultFile, name, mime, folder)
             showResult("İndirme tamamlandı", name)
