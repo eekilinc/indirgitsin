@@ -1,6 +1,7 @@
 package com.indirgitsin.app
 
 import android.media.MediaCodec
+import android.media.MediaCodecList
 import android.media.MediaCodecInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -96,13 +97,13 @@ class MediaFileMuxerInstrumentedTest {
             InstrumentationRegistry.getInstrumentation().context.assets.open("live/$asset").use { input ->
                 source.outputStream().use { input.copyTo(it) }
             }
-            assertDecodable(source, "audio/")
-            assertDecodable(source, "video/")
+            assertDecodable(source, "audio/", softwareOnly = true)
+            assertDecodable(source, "video/", softwareOnly = true)
             val output = File(directory, "recording.mp4")
             MediaFileMuxer.remuxCapture(source, output)
             MediaFileMuxer.validate(output, videoRequired = true)
             for (prefix in listOf("audio/", "video/")) {
-                assertDecodable(output, prefix)
+                assertDecodable(output, prefix, softwareOnly = true)
                 val before = timestamps(source, prefix)
                 val after = timestamps(output, prefix)
                 if (prefix == "video/") assertEquals("Capture lost video samples", before.size, after.size)
@@ -214,7 +215,7 @@ class MediaFileMuxerInstrumentedTest {
         } finally { extractor.release() }
     }
 
-    private fun assertDecodable(file: File, prefix: String) {
+    private fun assertDecodable(file: File, prefix: String, softwareOnly: Boolean = false) {
         val extractor = MediaExtractor()
         var decoder: MediaCodec? = null
         try {
@@ -222,7 +223,17 @@ class MediaFileMuxerInstrumentedTest {
             val track = (0 until extractor.trackCount).first { extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)!!.startsWith(prefix) }
             val format = extractor.getTrackFormat(track)
             extractor.selectTrack(track)
-            val codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
+            val mime = requireNotNull(format.getString(MediaFormat.KEY_MIME))
+            // CI 117: the emulator's Goldfish H.264 service segfaulted on a valid 64x64
+            // fMP4 fixture. Use AOSP software decoding for synthetic live captures;
+            // the original separate-video/audio test still exercises the default codec.
+            val codec = if (softwareOnly) {
+                val candidate = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.firstOrNull {
+                    !it.isEncoder && (it.name.startsWith("c2.android.") || it.name.startsWith("OMX.google.")) &&
+                        it.supportedTypes.any { supported -> supported.equals(mime, true) }
+                } ?: error("AOSP software decoder missing for $mime")
+                MediaCodec.createByCodecName(candidate.name)
+            } else MediaCodec.createDecoderByType(mime)
             decoder = codec
             codec.configure(format, null, null, 0)
             codec.start()
