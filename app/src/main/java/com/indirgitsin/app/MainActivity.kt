@@ -81,6 +81,12 @@ class MainActivity : ComponentActivity() {
             val appColor by SettingsStore.appColorFlow(context).collectAsState(initial = "red")
             val lang by SettingsStore.languageFlow(context).collectAsState(initial = "tr")
             val isDark = when (themePref) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
+            SideEffect {
+                androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !isDark
+                    isAppearanceLightNavigationBars = !isDark
+                }
+            }
             androidx.compose.runtime.CompositionLocalProvider(com.indirgitsin.app.data.lang.LocalAppLanguage provides lang) {
             IndirGitsinTheme(darkTheme = isDark, appColor = appColor) {
                 val bottomItems = listOf(
@@ -114,7 +120,7 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     bottomBar = {
-                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 8.dp) {
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                             bottomItems.forEach { item ->
                                 val selected = currentRoute == item.route
                                 NavigationBarItem(

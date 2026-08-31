@@ -33,6 +33,8 @@ jobs:
         run: node --test cipher/tools/tools.test.mjs
       - name: Release verification tooling tests
         run: python3 -m unittest discover -s tools -p 'test_*.py'
+      - name: Check optimized release code without signing secrets
+        run: ./gradlew :app:minifyReleaseWithR8 --stacktrace
       - name: Build debug APK for testing
         run: ./gradlew :app:assembleDebug --stacktrace
       - name: Verify APK signature

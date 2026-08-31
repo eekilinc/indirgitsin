@@ -229,7 +229,7 @@ object AppStrings {
     )
     private val en = mapOf(
         "operation_failed" to "Could not complete the action. Try again.",
-        "home_headline" to "Add a link.\nMake it yours to keep.",
+        "home_headline" to "Add a link.\nReady to download.",
         "home_subtitle" to "Choose video or audio and manage your downloads in one place.",
         "home_tagline" to "FROM LINK TO LIBRARY",
         "link_label" to "Your download link",

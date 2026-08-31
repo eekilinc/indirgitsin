@@ -337,13 +337,14 @@ private fun YtHowItWorks() {
 
 @Composable
 private fun RowScope.YtStep(num: String, title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.weight(1f)) {
-        Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(YtRed), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.weight(1f)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("0$num", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.weight(1f))
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             }
-            Text(num, color = YtRed, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall)
-            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+            Text(title, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

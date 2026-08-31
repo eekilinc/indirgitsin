@@ -59,7 +59,17 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) : Coroutine
                 performDownload()
             }
         } catch (e: CancellationException) {
-            if (stopReason == androidx.work.WorkInfo.STOP_REASON_CANCELLED_BY_APP) directory.deleteRecursively()
+            // Before API 31 WorkManager cannot expose an OS stop reason. Query persistent state
+            // outside the cancelled coroutine so an explicit cancel can still release its files.
+            val cancelledByUser = if (Build.VERSION.SDK_INT >= 31) {
+                stopReason == androidx.work.WorkInfo.STOP_REASON_CANCELLED_BY_APP
+            } else withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                runCatching {
+                    WorkManager.getInstance(applicationContext).getWorkInfoById(id)
+                        .get(3, java.util.concurrent.TimeUnit.SECONDS)?.state == androidx.work.WorkInfo.State.CANCELLED
+                }.getOrDefault(false)
+            }
+            if (cancelledByUser) directory.deleteRecursively()
             throw e
         } catch (e: Exception) {
             val reason = when (e) {

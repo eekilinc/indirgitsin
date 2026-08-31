@@ -2,9 +2,9 @@ package com.indirgitsin.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// YouTube Premium - Gerçek YouTube koyu tema
-val YtRed = Color(0xFFFF0000)
-val YtRedDark = Color(0xFFCC0000)
+// App palette. Legacy symbol names are retained for existing screens.
+val YtRed = Color(0xFFED334B)
+val YtRedDark = Color(0xFFAF1737)
 val YtBlue = Color(0xFF3EA6FF)
 val YtBackground = Color(0xFF0F0F0F) // YouTube koyu
 val YtSurface = Color(0xFF212121)
@@ -19,7 +19,7 @@ val YtChipUnselected = Color(0xFF272727)
 
 // Renk seçenekleri için palet
 enum class AppColor(val key: String, val primary: Color, val primaryDark: Color, val label: String) {
-    RED("red", Color(0xFFFF0000), Color(0xFFCC0000), "Kırmızı"),
+    RED("red", YtRed, YtRedDark, "Kırmızı"),
     BLUE("blue", Color(0xFF1565C0), Color(0xFF0D47A1), "Mavi"),
     GREEN("green", Color(0xFF2E7D32), Color(0xFF1B5E20), "Yeşil"),
     PURPLE("purple", Color(0xFF6A1B9A), Color(0xFF4A148C), "Mor"),
