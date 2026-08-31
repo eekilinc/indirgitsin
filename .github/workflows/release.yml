@@ -132,7 +132,7 @@ jobs:
           mv apk/app-debug.apk "indir-gitsin-1.2.0-dev.${GITHUB_RUN_NUMBER}-preview.apk"
           sha256sum indir-gitsin-*.apk > SHA256SUMS.txt
       - name: Publish test prerelease
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: v1.2.0-dev.${{ github.run_number }}-preview
           target_commitish: ${{ github.sha }}
@@ -269,7 +269,7 @@ jobs:
         run: sha256sum --check SHA256SUMS.txt
       - name: Publish signed final APK
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           name: İndir Gitsin ${{ github.ref_name }} — Final
           prerelease: false
