@@ -495,7 +495,7 @@ private fun YtDownloadSheet(
             val audioOnlyStreams = video.streams.filter { it.isAudioOnly && it.isDownloadable }
                 .sortedWith(compareByDescending<StreamOption> { it.extension.equals(audioFormat, true) }.thenByDescending { it.bitrate })
             val baseByTab = if (selectedTab == 0 || video.isLive) muxedStreams else audioOnlyStreams
-            val (filtered, chipNote) = when (filterChip) {
+            val (filtered, chipNote) = when (if (video.isLive) 0 else filterChip) {
                 1 -> baseByTab.filter { it.isVideo } to null
                 2 -> audioOnlyStreams to null
                 3 -> if (video.durationSeconds in 1..65) baseByTab to null else emptyList<StreamOption>() to t("shorts_not", YoutubeLinkHelper.formatDuration(video.durationSeconds))
