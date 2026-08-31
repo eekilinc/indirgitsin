@@ -13,6 +13,8 @@ import com.indirgitsin.app.data.downloader.PartialDownloads
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,7 +62,16 @@ class DownloadQueueInstrumentedTest {
             PartialDownloads.clearInactive(context)
             assertTrue(java.io.File(active, "primary.part").isFile)
             driver.setAllConstraintsMet(pending.id)
-            val failed = requireNotNull(manager.getWorkInfoById(pending.id).get())
+            // The worker's result is persisted asynchronously even with SynchronousExecutor.
+            // Wait for the actual terminal state instead of assuming setAllConstraintsMet joins it.
+            val failed = withTimeout(10_000) {
+                var current = requireNotNull(manager.getWorkInfoById(pending.id).get())
+                while (!current.state.isFinished) {
+                    delay(20)
+                    current = requireNotNull(manager.getWorkInfoById(pending.id).get())
+                }
+                current
+            }
             assertEquals(WorkInfo.State.FAILED, failed.state)
             assertEquals(video.id, failed.outputData.getString("videoId"))
             SettingsStore.setUnmetered(context, false)

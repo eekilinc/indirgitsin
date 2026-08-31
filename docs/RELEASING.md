@@ -12,6 +12,8 @@ Debug çıktı: `app/build/outputs/apk/debug/app-debug.apk`. Test paketi `com.in
 ## Doğrulama
 PR/main ve yetkili manuel çalıştırmalarda birim testleri, lint, debug derlemesi ve Android 10/14/16 cihaz testleri çalışır. Cihaz raporları AAC/AVC birleştirme/çözme, kuyruk/tekrar deneme, açılış ve bağlantı girişini kapsar. Emülatörün açılış/bellek kanıtları artifact olarak saklanır.
 
+İmzalı aday kontrolü diğer işlerle paraleldir; herkese açık final yayını birim/lint, üç debug cihazı ve imzalı cihaz işlerinin **tümüne** bağlıdır. Cihaz testleri tek tek 60 saniye ile sınırlıdır. İmzalı çalıştırma ayrıca başlangıç çökmelerini yakalar, toplam test beklemesini sınırlar ve logcat/UTP raporlarını saklar.
+
 Main push'u test ön sürümü üretir. Yetkili workflow_dispatch çalıştırması kalıcı anahtarla aday APK/AAB üretip test eder; tag yoksa final yayımlamaz. AAB üretmek Play Store'a yüklemek değildir.
 
 ## Kalıcı imza
@@ -32,3 +34,8 @@ Uygulama sürümü `vX.Y.Z` etiketinden, Android versionCode CI run numarasında
 Optimize final ayrıca Android 14'te cihaz testinden geçirilir. 1.1.1 APK'nın sabit SHA-256 değeri doğrulanır; eski sürüm kurulur, yeni aday onun üzerine yüklenir. Aynı emülatörde iki sürümün 5 açılış örneği ve boşta PSS bellek görüntüsü kaydedilir. Gerçek telefon hızı/batarya ölçümü değildir.
 
 R8 mapping dosyası, AAB ve ayrıntılı raporlar doğrulama artifact'inde bulunur. Play Console'a otomatik yükleme yoktur. [Lisans durumu](LICENSE_STATUS.md) ve [yayın hazırlığı](PUBLISHING_READINESS.md) çözülmeden mağaza uygunluğu varsayılmamalıdır.
+
+## Optimize APK'da cihaz testi
+Test APK'sı ayrı derlendiği için R8, testlerin ortak framework API'lerine ihtiyaç duyduğunu uygulama derlemesinden göremez. Örneğin `androidx.tracing.Trace` kaldırılırsa test çalıştırıcısı daha testler başlamadan çöker. `app/proguard-instrumentation-api.pro` bu ortak API'leri korur; aynı kurallar dağıtılan APK'da da kullanılır, ayrı bir test uygulaması varyantı üretilmez. Yöntem gövdelerinin optimizasyonu açıktır.
+
+Liste, `tools/instrumentation-keep-rules.py` ile test APK'sının DEX başvuruları ve hedef APK'nın R8 `mapping.txt`/`usage.txt` raporlarından çıkarılır. Test veya framework bağımlılıkları değişince liste yeniden incelenmeli ve imzalı cihaz testi çalıştırılmalıdır. Test aracının kendi sınıfları `proguard-test-rules.pro` ile korunur; bu dosya dağıtılan uygulamanın küçültmesini kapatmaz.

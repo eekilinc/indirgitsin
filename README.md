@@ -32,7 +32,7 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 | Özellik | Nasıl çalışır? |
 |---|---|
 | Sesli video | MP4 veya cihazın desteklediği WebM eşleştirmesi; sessiz çıktıyı başarılı saymaz. |
-| Ses dosyası | Gerçek M4A/WebM akışı; sahte MP3 uzantısı yok. |
+| Ses dosyası | M4A veya WebM ses akışı özgün biçiminde kaydedilir. |
 | Kalıcı kuyruk | WorkManager ile iki eşzamanlı iş, iptal ve başarısız işten yeniden deneme. |
 | İlerleme | Toplam video/ses hızı ve tahmini kalan aktarım süresi. |
 | Ağ tercihi | İsteğe bağlı yalnızca tarifesiz ağda indirme. |
@@ -42,7 +42,7 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 
 ## 1.2 hazırlığında
 
-Çalışan son final **1.1.1**'dir. Bu geliştirme dalındaki değişiklikler final diye sunulmaz:
+Çalışan son final **1.1.1**'dir. Bu geliştirme dalında 1.2 adayı hazırlanıyor:
 
 - Bağlantı girişini öne çıkaran yeni ana sayfa ve özgün indirme simgesi.
 - Kesintiden sonra doğrulanmış 4 MB HTTP parçalarından devam. Dosya kimliği doğrulanamıyorsa güvenli yeniden başlangıç.
