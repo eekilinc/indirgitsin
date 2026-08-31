@@ -10,7 +10,7 @@ cd indirgitsin
 Debug çıktı: `app/build/outputs/apk/debug/app-debug.apk`. Test paketi `com.indirgitsin.app.preview`; kalıcı final paketi **com.indirgitsin.app.stable**. Final ve test ayrı kurulur. Test APK'larının debug imzası değişebilir; final imzası değiştirilmemelidir.
 
 ## Doğrulama
-PR/main/codex dallarında birim testleri, lint, debug derlemesi ve Android 10/14/16 cihaz testleri çalışır. Cihaz raporları AAC/AVC birleştirme/çözme, kuyruk/tekrar deneme, açılış ve bağlantı girişini kapsar. Emülatörün açılış/bellek kanıtları artifact olarak saklanır.
+PR/main ve yetkili manuel çalıştırmalarda birim testleri, lint, debug derlemesi ve Android 10/14/16 cihaz testleri çalışır. Cihaz raporları AAC/AVC birleştirme/çözme, kuyruk/tekrar deneme, açılış ve bağlantı girişini kapsar. Emülatörün açılış/bellek kanıtları artifact olarak saklanır.
 
 Main push'u test ön sürümü üretir. Yetkili workflow_dispatch çalıştırması kalıcı anahtarla aday APK/AAB üretip test eder; tag yoksa final yayımlamaz. AAB üretmek Play Store'a yüklemek değildir.
 

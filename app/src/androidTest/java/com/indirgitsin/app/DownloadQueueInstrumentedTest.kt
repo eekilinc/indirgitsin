@@ -9,6 +9,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import com.indirgitsin.app.data.SettingsStore
 import com.indirgitsin.app.data.downloader.DownloadWorker
 import com.indirgitsin.app.data.downloader.FileDownloader
+import com.indirgitsin.app.data.downloader.PartialDownloads
 import com.indirgitsin.app.data.model.StreamOption
 import com.indirgitsin.app.data.model.VideoInfo
 import kotlinx.coroutines.runBlocking
@@ -44,20 +45,34 @@ class DownloadQueueInstrumentedTest {
             val pending = manager.getWorkInfosByTag(FileDownloader.TAG).get().single()
             assertEquals(WorkInfo.State.ENQUEUED, pending.state)
             assertEquals(NetworkType.UNMETERED, pending.constraints.requiredNetworkType)
+            val resumeTag = pending.tags.single { it.startsWith("resume:") }
+            val root = java.io.File(context.noBackupFilesDir, "downloads")
+            val active = java.io.File(root, resumeTag.removePrefix("resume:")).apply { mkdirs() }
+            java.io.File(active, "primary.part").writeText("active transfer")
+            val stale = java.io.File(root, java.util.UUID.randomUUID().toString()).apply { mkdirs() }
+            java.io.File(stale, "primary.part").writeText("stale transfer")
+            stale.setLastModified(System.currentTimeMillis() - java.util.concurrent.TimeUnit.DAYS.toMillis(8))
+            PartialDownloads.clearInactive(context, expiredOnly = true)
+            assertTrue(active.isDirectory)
+            assertFalse(stale.exists())
+            PartialDownloads.clearInactive(context)
+            assertTrue(java.io.File(active, "primary.part").isFile)
             driver.setAllConstraintsMet(pending.id)
-            val failed = manager.getWorkInfoById(pending.id).get()
+            val failed = requireNotNull(manager.getWorkInfoById(pending.id).get())
             assertEquals(WorkInfo.State.FAILED, failed.state)
             assertEquals(video.id, failed.outputData.getString("videoId"))
             SettingsStore.setUnmetered(context, false)
             assertTrue(FileDownloader.retry(context, failed))
             val retry = manager.getWorkInfosByTag(FileDownloader.TAG).get().single { !it.state.isFinished }
             assertNotEquals(pending.id, retry.id)
+            assertTrue(resumeTag in retry.tags)
             assertEquals(NetworkType.CONNECTED, retry.constraints.requiredNetworkType)
             manager.cancelWorkById(retry.id).result.get()
-            assertEquals(WorkInfo.State.CANCELLED, manager.getWorkInfoById(retry.id).get().state)
+            assertEquals(WorkInfo.State.CANCELLED, requireNotNull(manager.getWorkInfoById(retry.id).get()).state)
             assertTrue(FileDownloader.enqueue(context, video, option))
         } finally {
             manager.cancelAllWorkByTag(FileDownloader.TAG).result.get()
+            PartialDownloads.clearInactive(context)
             SettingsStore.setUnmetered(context, false)
         }
     }

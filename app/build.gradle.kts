@@ -79,6 +79,7 @@ dependencies {
     // Compose 1.8 includes lint tooling that can read Kotlin 2.1 metadata.
     val composeBom = platform("androidx.compose:compose-bom:2025.06.01")
     implementation(composeBom)
+    androidTestImplementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
