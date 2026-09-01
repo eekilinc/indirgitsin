@@ -122,7 +122,10 @@ class PlayerInstrumentedTest {
     }
 
     private fun systemBarsHidden(activity: PlayerActivity): Boolean = if (Build.VERSION.SDK_INT >= 30) {
-        ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.systemBars()) == false
+        // Some CI profiles use hardware navigation and therefore have no navigation-bar
+        // inset source. The status bar exists on every profile and reliably proves that
+        // immersive mode was applied without treating an absent nav bar as a failure.
+        ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.statusBars()) == false
     } else {
         @Suppress("DEPRECATION")
         val flags = activity.window.decorView.systemUiVisibility
@@ -130,7 +133,7 @@ class PlayerInstrumentedTest {
     }
 
     private fun systemBarsShown(activity: PlayerActivity): Boolean = if (Build.VERSION.SDK_INT >= 30) {
-        ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.systemBars()) == true
+        ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.statusBars()) == true
     } else {
         @Suppress("DEPRECATION")
         activity.window.decorView.systemUiVisibility and
