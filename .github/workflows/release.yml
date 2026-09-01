@@ -33,7 +33,7 @@ jobs:
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
       - run: chmod +x gradlew
       - name: Unit tests and lint
-        run: ./gradlew :app:testDebugUnitTest :app:lintDebug :cipher:library:testDebugUnitTest --stacktrace
+        run: bash tools/gradle-network-retry.sh :app:testDebugUnitTest :app:lintDebug :cipher:library:testDebugUnitTest --stacktrace
       - name: Cipher tooling tests
         run: node --test cipher/tools/tools.test.mjs
       - name: Release verification tooling tests
@@ -41,9 +41,9 @@ jobs:
       - name: Check optimized release code without signing secrets
         env:
           ANDROID_TEST_BUILD_TYPE: release
-        run: ./gradlew :app:minifyReleaseWithR8 :app:minifyReleaseAndroidTestWithR8 --stacktrace
+        run: bash tools/gradle-network-retry.sh :app:minifyReleaseWithR8 :app:minifyReleaseAndroidTestWithR8 --stacktrace
       - name: Build debug APK for testing
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: bash tools/gradle-network-retry.sh :app:assembleDebug --stacktrace
       - name: Verify APK signature
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
@@ -107,7 +107,7 @@ jobs:
           emulator-boot-timeout: 300
           disable-animations: true
           script: |
-            ./gradlew :app:connectedDebugAndroidTest --stacktrace
+            bash tools/gradle-network-retry.sh :app:connectedDebugAndroidTest --stacktrace
             adb install -r -g app/build/outputs/apk/debug/app-debug.apk
             python3 tools/capture-device.py com.indirgitsin.app.preview app/build/reports/device-evidence
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -195,7 +195,7 @@ jobs:
       - name: Build and check signed release
         run: |
           chmod +x gradlew
-          ./gradlew :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease :app:assembleReleaseAndroidTest --stacktrace
+          bash tools/gradle-network-retry.sh :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease :app:assembleReleaseAndroidTest --stacktrace
       - name: Reserve disk space and enable KVM
         run: |
           sudo rm -rf /usr/share/dotnet
