@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +56,7 @@ import java.util.Locale
 @Composable
 fun VideoPlayerScreen(model: VideoPlaybackModel, title: String = "", onBack: () -> Unit) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val activity = context as Activity
     val player = model.player
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
@@ -110,7 +112,9 @@ fun VideoPlayerScreen(model: VideoPlaybackModel, title: String = "", onBack: () 
         onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(activity, fullscreen) {
+    // Some Android versions reveal system bars while applying the requested rotation.
+    // Re-apply immersive state after each configuration update.
+    LaunchedEffect(activity, fullscreen, configuration) {
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         controller.isAppearanceLightStatusBars = false
         controller.isAppearanceLightNavigationBars = false

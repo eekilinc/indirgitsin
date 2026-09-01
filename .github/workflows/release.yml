@@ -107,7 +107,7 @@ jobs:
           emulator-boot-timeout: 300
           disable-animations: true
           script: |
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.additionalTestOutputDir=/sdcard/Android/data/com.indirgitsin.app.preview/files/player-evidence --stacktrace
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.additionalTestOutputDir=/sdcard/Android/data/com.indirgitsin.app.preview.test/files/player-evidence --stacktrace
             adb install -r -g app/build/outputs/apk/debug/app-debug.apk
             python3 tools/capture-device.py com.indirgitsin.app.preview app/build/reports/device-evidence
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

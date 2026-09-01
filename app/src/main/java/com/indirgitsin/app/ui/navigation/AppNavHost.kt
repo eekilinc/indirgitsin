@@ -1,10 +1,13 @@
 package com.indirgitsin.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.indirgitsin.app.HomeViewModel
@@ -71,6 +74,18 @@ fun AppNavHost(
         }
         composable(Screen.Settings.route) {
             SettingsScreen()
+        }
+        // Preserve saved navigation stacks from versions that hosted playback in MainActivity.
+        composable("player/{uri}/{title}", arguments = listOf(
+            navArgument("uri") { type = NavType.StringType },
+            navArgument("title") { type = NavType.StringType }
+        )) { entry ->
+            LaunchedEffect(entry) {
+                val uri = entry.arguments?.getString("uri")
+                val title = entry.arguments?.getString("title").orEmpty()
+                navController.popBackStack()
+                if (uri != null) context.startActivity(com.indirgitsin.app.PlayerActivity.intent(context, android.net.Uri.parse(uri), title))
+            }
         }
     }
 }

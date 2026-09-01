@@ -32,7 +32,9 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 | Özellik | Nasıl çalışır? |
 |---|---|
 | Sesli video | MP4 veya cihazın desteklediği WebM eşleştirmesi; sessiz çıktıyı başarılı saymaz. |
-| Ses dosyası | M4A veya WebM ses akışı özgün biçiminde kaydedilir. |
+| Ses dosyası | M4A/WebM özgün ses veya cihazda dönüştürülen 128/192/320 kbps MP3. |
+| Ses kapakları | MP3 içine gömülü kapak, başlık ve sanatçı; M4A/WebM için çevrimdışı uygulama kapağı. |
+| Tam ekran | Yatay video, gizlenen sistem çubukları, konumu koruyan ekran döndürme. |
 | Kalıcı kuyruk | WorkManager ile iki eşzamanlı iş, iptal ve başarısız işten yeniden deneme. |
 | İlerleme | Toplam video/ses hızı ve tahmini kalan aktarım süresi. |
 | Ağ tercihi | İsteğe bağlı yalnızca tarifesiz ağda indirme. |
@@ -40,9 +42,9 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 | Kitaplık | Yerel geçmiş ve uygulama içi oynatma. |
 | Görünüm | Türkçe/İngilizce, açık/koyu tema ve vurgu rengi seçimi. |
 
-## 1.2 hazırlığında
+## 1.2 ile gelenler
 
-Çalışan son final **1.1.1**'dir. Bu geliştirme dalındaki **1.2.0-dev.113** imzalı adayı doğrulandı; henüz public final değildir:
+MP3, canlı kayıt ve yeni oynatıcı bir arada. Kalıcı paket ve imza korunur; önceki finali kaldırmadan güncelleyebilirsiniz:
 
 - Bağlantı girişini öne çıkaran yeni ana sayfa ve özgün indirme simgesi.
 - Kesintiden sonra doğrulanmış 4 MB HTTP parçalarından devam. Dosya kimliği doğrulanamıyorsa güvenli yeniden başlangıç.
@@ -50,6 +52,8 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 - Public GitHub güncelleme kontrolü; otomatik kontrolde altı saatlik aralık ve HTTP önbelleği.
 - TR/EN çevrimdışı gizlilik politikası.
 - Android 16 hedefi, optimize final APK/AAB ve daha geniş cihaz doğrulaması.
+- Kapaklı ses oynatıcı; görsel bulunmayan eski dosyalarda müzik görünümü.
+- Videoda tam ekran, ekran döndürmede konumun korunması ve oynatma hatasında yeniden deneme.
 - Gerçek MP3 dönüşümü: 128, 192 veya 320 kbps; kaynak ses cihazda MP3’e kodlanır.
 - Şifresiz birleşik HLS canlı kayıt: 5/15/30/60 dakika, **Durdur ve kaydet**, kesintiden önceki bölümün kurtarılması.
 
@@ -66,15 +70,15 @@ YouTube video, Shorts, Music ve oynatma listesi bağlantılarını ekleyin; mevc
 
 Final paket kimliği `com.indirgitsin.app.stable` olarak sabittir. 1.1.1 ve sonraki final güncellemeleri aynı imzayı korur. **İndir Gitsin Test** ayrı uygulamadır; test uygulamasını kaldırmak zorunlu değildir.
 
-## Güncel test sürümü ve doğrulama
+## Final ve doğrulama
 
-**[MP3 + canlı kayıt APK’sını indir](https://github.com/eekilinc/indirgitsin/releases/download/candidate-1.2.0-118/indir-gitsin-1.2.0-dev.118.apk)** · [Sürüm, kaynak ZIP ve SHA-256](https://github.com/eekilinc/indirgitsin/releases/tag/candidate-1.2.0-118)
+**[1.2.0 APK’yı indir](https://github.com/eekilinc/indirgitsin/releases/download/v1.2.0/indir-gitsin-1.2.0.apk)** · [Sürüm, kaynak ZIP ve SHA-256](https://github.com/eekilinc/indirgitsin/releases/tag/v1.2.0)
 
-Bu, **1.2.0-dev.118 imzalı test adayıdır**; GitHub’daki son final hâlâ 1.1.1’dir. Kalıcı imza ve paket kimliği korunur; 1.1.1’in üzerine kurulur. Uygulamayı kaldırmayın.
+Final yayın kapıları: 57 uygulama birim testi, 62 cipher testi, Node/Python kontrolleri ve lint; Android 10/14/16’da 14’er cihaz testi; kalıcı imzalı APK’da Android 14 üzerinde aynı 14 test. Sertifika, 16 KiB native hizalaması ve 1.1.1’den güncelleme ayrıca denetlenir. Bir kapı başarısız olursa final yayımlanmaz. APK’ya ait tam çalışma bağlantısı sürüm sayfasındadır.
 
-[CI 118](https://github.com/eekilinc/indirgitsin/actions/runs/33412840402): 54 uygulama birim testi, 62 cipher testi, Node/Python kontrolleri ve lint; Android 10/14/16’da 10’ar cihaz testi; imzalı APK üzerinde 10 test ve 1.1.1’den güncelleme başarılıdır. Native kitaplıkların dört ABI’de ELF/ZIP 16 KiB hizalaması kontrol edildi.
+Kullanıcı önceki imzalı adayda sesli video indirme ve MP3 dönüşümünü telefonunda doğruladı. Yeni kapak/tam ekran özellikleri için [kullanım ve cihaz kontrolü](docs/PLAYBACK.md); ölçümlerin kapsamı ve kalan fiziksel cihaz kontrolleri için [doğrulama rehberi](docs/VALIDATION.md).
 
-MP3 ve canlı kayıt dahil APK **16,81 MB → 4,89 MB**. Aynı Android 14 emülatöründe ortanca soğuk süreç açılışı **797 → 632 ms**, tek boşta PSS örneği **54.557 → 34.232 KiB**. Gerçek telefon/indirme hızı veya pil garantisi değildir. [Ham ölçümler](docs/measurements/candidate-118.json) · [Test kapsamı ve sınırlar](docs/VALIDATION.md).
+Önceki **1.2.0-dev.118** ölçümünde APK **16,81 MB → 4,89 MB**, aynı Android 14 emülatöründe ortanca soğuk açılış **797 → 632 ms**, boşta PSS **54.557 → 34.232 KiB** idi. Bunlar kapak/tam ekran öncesi adayın değerleridir; final dosya boyutu sürüm sayfasındadır. Gerçek telefon, indirme hızı veya pil garantisi değildir. [Ham ölçümler](docs/measurements/candidate-118.json).
 
 ## Neden hızlı?
 
@@ -93,9 +97,11 @@ flowchart LR
 
 ## Sınırları açıkça
 
-Yeni 1.2 dalında MP3 kodlama ve sınırlı HLS canlı kayıt vardır; 1.1.1 finalde bu özellikler yoktur. MP3 kayıplı dönüşümdür; yüksek bitrate kaynak sesin kalitesini artırmaz. Canlı kayıt en fazla 60 dakika / 2 GiB ile sınırlıdır; en son tamamlanan parçadan başlar. Birleşik AVC/AAC akışları desteklenir; ayrı ses listeleri, DASH ve DRM desteklenmez. **İptal** geçici kaydı siler; **Durdur ve kaydet** tamamlanan bölümü saklar. [Kullanım ve sınırlar](docs/MP3_LIVE.md). Kalite, kaynak akışlarına ve cihaz codec desteğine bağlıdır. WebM/Opus birleştirme Android 10+, MP4/AV1 Android 14+ ister. YouTube değişiklikleri veya erişim kısıtları bazı videoları etkileyebilir.
+1.2 sürümünde MP3 kodlama ve sınırlı HLS canlı kayıt vardır. MP3 kayıplı dönüşümdür; yüksek bitrate kaynak sesin kalitesini artırmaz. Canlı kayıt en fazla 60 dakika / 2 GiB ile sınırlıdır; en son tamamlanan parçadan başlar. Birleşik AVC/AAC akışları desteklenir; ayrı ses listeleri, DASH ve DRM desteklenmez. **İptal** geçici kaydı siler; **Durdur ve kaydet** tamamlanan bölümü saklar. [Kullanım ve sınırlar](docs/MP3_LIVE.md). Kalite, kaynak akışlarına ve cihaz codec desteğine bağlıdır. WebM/Opus birleştirme Android 10+, MP4/AV1 Android 14+ ister. YouTube değişiklikleri veya erişim kısıtları bazı videoları etkileyebilir.
 
 Devam etme, doğrulanmış tam HTTP parçalarını kullanır; kesilen son parça yeniden alınabilir. Tamamlanan dosyalar ortak Download alanındadır. Android'in zorla durdurma, ağ ve arka plan sınırları işlemleri erteleyebilir.
+
+MP3 kapağı dosyayla birlikte paylaşılır. M4A/WebM kapakları yalnızca uygulamanın özel alanında tutulur; kapak deposu 256 kayıtla sınırlıdır. Eski dosyalarda gömülü kapak yoksa müzik simgesi gösterilir. Arka planda müzik çalma ve küçük pencere (PiP) bu sürümde yoktur. [Oynatıcı ayrıntıları](docs/PLAYBACK.md).
 
 ## Geliştirme ve kalite
 

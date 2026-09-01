@@ -122,7 +122,9 @@ class PlayerInstrumentedTest {
         compose.waitForIdle()
         val image = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
-            val folder = File(context.getExternalFilesDir(null), "player-evidence").apply { mkdirs() }
+            val requested = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
+            val folder = (requested?.let(::File)
+                ?: File(requireNotNull(instrumentation.context.getExternalFilesDir(null)), "player-evidence")).apply { mkdirs() }
             File(folder, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
         } finally { image.recycle() }
     }
