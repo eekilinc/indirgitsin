@@ -46,14 +46,12 @@ class PlayerInstrumentedTest {
                 waitFor("audio_artwork")
                 compose.onNodeWithTag("audio_artwork").assertIsDisplayed()
                 compose.onNodeWithTag("fullscreen_toggle").assertDoesNotExist()
-                screenshot("audio-cover")
             }
             MediaArtwork.remove(context, uri)
             assertNull(MediaArtwork.read(context, uri))
             launch(file).use {
                 waitFor("audio_fallback")
                 compose.onNodeWithTag("audio_fallback").assertIsDisplayed()
-                screenshot("audio-placeholder")
             }
         } finally { MediaArtwork.remove(context, uri); file.delete() }
     }
@@ -71,7 +69,6 @@ class PlayerInstrumentedTest {
                 waitFor("play_pause")
                 compose.onNodeWithTag("play_pause").performClick()
                 compose.onNodeWithTag("player_seek").performSemanticsAction(SemanticsActions.SetProgress) { assertTrue(it(.5f)) }
-                screenshot("video-seek")
                 // A paused midpoint remains unchanged through both rotation and Activity recreation.
                 compose.onNodeWithText("00:04").assertIsDisplayed()
                 compose.onNodeWithTag("fullscreen_toggle").performClick()
@@ -84,7 +81,6 @@ class PlayerInstrumentedTest {
                     hidden
                 }
                 compose.onNodeWithText("00:04").assertIsDisplayed()
-                screenshot("video-fullscreen")
                 scenario.recreate()
                 waitFor("fullscreen_toggle")
                 compose.onNodeWithText("00:04").assertIsDisplayed()
@@ -99,7 +95,6 @@ class PlayerInstrumentedTest {
                 }
                 compose.onNodeWithTag("player").assertIsDisplayed()
                 compose.onNodeWithText("00:04").assertIsDisplayed()
-                screenshot("video-normal")
             }
         } finally { file.delete() }
     }
@@ -116,17 +111,6 @@ class PlayerInstrumentedTest {
 
     private fun waitFor(tag: String) {
         compose.waitUntil(15_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
-    }
-
-    private fun screenshot(name: String) {
-        compose.waitForIdle()
-        val image = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
-        try {
-            val requested = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
-            val folder = (requested?.let(::File)
-                ?: File(requireNotNull(instrumentation.context.getExternalFilesDir(null)), "player-evidence")).apply { mkdirs() }
-            File(folder, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        } finally { image.recycle() }
     }
 
     private fun writeAudio(file: File) {

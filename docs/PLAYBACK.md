@@ -20,7 +20,7 @@ Oynat/duraklat, 10 saniye ileri/geri, kaydırarak konum seçme, 0,5–2× hız v
 
 ## Kabul kontrolleri
 
-Otomatik testler gerçek MP3'ün gömülü JPEG/Unicode etiketlerini Android medya okuyucusuyla açar ve sesini çözer. Oynatıcı testleri çevrimdışı kapak, kapaksız eski dosya, tam ekran/sistem çubukları, geri dönüş, konumun ekran döndürme/Activity yeniden yaratma sonrasında korunması ve eksik dosya hatasını kapsar. Cihaz ekran görüntüleri CI raporlarına eklenir.
+Otomatik testler gerçek MP3'ün gömülü JPEG/Unicode etiketlerini Android medya okuyucusuyla açar ve sesini çözer. Oynatıcı testleri çevrimdışı kapak, kapaksız eski dosya, tam ekran/sistem çubukları, geri dönüş, konumun ekran döndürme/Activity yeniden yaratma sonrasında korunması ve eksik dosya hatasını Compose semantiği ve Android pencere durumu üzerinden doğrular.
 
 Gerçek telefonda son kontrol: yeni MP3'ü uygulamada ve başka bir müzik oynatıcıda açın; M4A/WebM sesin çevrimdışı kapağını kontrol edin; bir videoyu tam ekrana alın, ileri sarın, ekranı döndürün ve geri tuşuyla çıkın. Otomatik emülatör testleri tüm üretici ve ekran biçimlerini kapsamaz.
 
