@@ -85,6 +85,14 @@ class PlayerInstrumentedTest {
                 scenario.recreate()
                 waitFor("fullscreen_toggle")
                 compose.onNodeWithText("00:04").assertIsDisplayed()
+                // Wait for the recreated window to finish re-applying immersive landscape before Back.
+                compose.waitUntil(10_000) {
+                    var restoredFullscreen = false
+                    scenario.onActivity {
+                        restoredFullscreen = it.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE && systemBarsHidden(it)
+                    }
+                    restoredFullscreen
+                }
                 instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
                 compose.waitUntil(10_000) {
                     var restored = false
