@@ -4,7 +4,9 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.view.KeyEvent
+import android.view.View
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -75,8 +77,7 @@ class PlayerInstrumentedTest {
                 compose.waitUntil(10_000) {
                     var hidden = false
                     scenario.onActivity {
-                        hidden = it.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE &&
-                            ViewCompat.getRootWindowInsets(it.window.decorView)?.isVisible(WindowInsetsCompat.Type.statusBars()) == false
+                        hidden = it.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE && systemBarsHidden(it)
                     }
                     hidden
                 }
@@ -88,8 +89,7 @@ class PlayerInstrumentedTest {
                 compose.waitUntil(10_000) {
                     var restored = false
                     scenario.onActivity {
-                        restored = it.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED &&
-                            ViewCompat.getRootWindowInsets(it.window.decorView)?.isVisible(WindowInsetsCompat.Type.statusBars()) == true
+                        restored = it.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED && systemBarsShown(it)
                     }
                     restored
                 }
@@ -111,6 +111,22 @@ class PlayerInstrumentedTest {
 
     private fun waitFor(tag: String) {
         compose.waitUntil(15_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    private fun systemBarsHidden(activity: PlayerActivity): Boolean = if (Build.VERSION.SDK_INT >= 30) {
+        ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.systemBars()) == false
+    } else {
+        @Suppress("DEPRECATION")
+        val flags = activity.window.decorView.systemUiVisibility
+        flags and View.SYSTEM_UI_FLAG_FULLSCREEN != 0 && flags and View.SYSTEM_UI_FLAG_HIDE_NAVIGATION != 0
+    }
+
+    private fun systemBarsShown(activity: PlayerActivity): Boolean = if (Build.VERSION.SDK_INT >= 30) {
+        ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.systemBars()) == true
+    } else {
+        @Suppress("DEPRECATION")
+        activity.window.decorView.systemUiVisibility and
+            (View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0
     }
 
     private fun writeAudio(file: File) {
